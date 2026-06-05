@@ -253,16 +253,16 @@ function Dashboard({depenses,stock,ventes,factures}) {
 function Categories({catDep,setCatDep,catStk,setCatStk,showToast}) {
   const {theme}=useTheme();
   const [tab,setTab]=useState("dep");
-  const [form,setForm]=useState({label:"",icon:"📱",color:"#0A84FF"});
+  const [form,setForm]=useState({label:"",icon:"📱",color:"#0A84FF",where:"dep"});
   const [showForm,setShowForm]=useState(false);
 
   const addCat=()=>{
     if(!form.label.trim())return showToast("Nom requis",true);
     const id=form.label.toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
     const newCat={id,label:form.label,icon:form.icon,color:form.color};
-    if(tab==="dep"){setCatDep([...catDep,newCat]);}
-    else{setCatStk([...catStk,newCat]);}
-    setForm({label:"",icon:"📱",color:"#0A84FF"});
+    if(form.where==="dep"||form.where==="both"){setCatDep([...catDep,newCat]);}
+    if(form.where==="stk"||form.where==="both"){setCatStk([...catStk,newCat]);}
+    setForm({label:"",icon:"📱",color:"#0A84FF",where:"dep"});
     setShowForm(false);
     showToast("Catégorie ajoutée ✓");
   };
@@ -297,6 +297,18 @@ function Categories({catDep,setCatDep,catStk,setCatStk,showToast}) {
           <div style={{fontSize:14,fontWeight:700,color:theme.text,marginBottom:14}}>Nouvelle catégorie</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
             <Inp label="Nom *" value={form.label} onChange={e=>setForm({...form,label:e.target.value})} placeholder="Ex: Tablettes"/>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Utiliser dans</label>
+              <div style={{display:"flex",gap:8}}>
+                {[["dep","📤 Dépenses"],["stk","📦 Stock"],["both","Les deux"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setForm({...form,where:v})}
+                    style={{flex:1,padding:"8px",borderRadius:9,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",
+                      borderColor:form.where===v?"#0A84FF":theme.border,background:form.where===v?"rgba(10,132,255,0.15)":theme.toggleBg,color:form.where===v?"#0A84FF":theme.textMuted}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div style={{display:"flex",flexDirection:"column",gap:5}}>
               <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Icône</label>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
