@@ -641,6 +641,14 @@ function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
   );
 }
 
+// ─── Champs spéciaux par catégorie ───────────────────────────────────────────
+const CHAMPS_CAT = {
+  iphones:     [{key:"imei",label:"IMEI",placeholder:"Ex: 354823110987654"},{key:"couleur",label:"Couleur",placeholder:"Ex: Noir Sidéral"},{key:"capacite",label:"Capacité",placeholder:"Ex: 256GB"},{key:"etat",label:"État",placeholder:"Ex: Neuf / Reconditionné"}],
+  ordinateurs: [{key:"serie",label:"N° de série",placeholder:"Ex: C02XL0JHJGH5"},{key:"ram",label:"RAM",placeholder:"Ex: 8GB"},{key:"stockage",label:"Stockage",placeholder:"Ex: 512GB SSD"},{key:"etat",label:"État",placeholder:"Ex: Neuf"}],
+  accessoires: [{key:"ref",label:"Référence",placeholder:"Ex: AP-MWP22ZM/A"},{key:"couleur",label:"Couleur",placeholder:"Ex: Blanc"}],
+  pieces:      [{key:"ref",label:"Référence",placeholder:"Ex: BAT-IP13-001"},{key:"compatible",label:"Compatible avec",placeholder:"Ex: iPhone 13 / 13 Pro"}],
+};
+
 // ─── Factures ─────────────────────────────────────────────────────────────────
 function Factures({factures,setFactures,stock,showToast}) {
   const {theme}=useTheme();
@@ -648,14 +656,26 @@ function Factures({factures,setFactures,stock,showToast}) {
   const [preview,setPreview]=useState(null);
   const printRef=useRef();
   const [loading,setLoading]=useState(false);
-  const [lignes,setLignes]=useState([{desc:"",qte:1,pu:0}]);
+  const [lignes,setLignes]=useState([{desc:"",cat:"iphones",qte:1,pu:0,details:{}}]);
   const [form,setForm]=useState({client:"",email:"",telephone:"",adresse:"",date:today(),note:""});
 
   const totalLignes=lignes.reduce((s,l)=>s+l.qte*l.pu,0);
   const numFacture=()=>`FAC-${new Date().getFullYear()}-${String(factures.length+1).padStart(3,"0")}`;
 
-  const addLigne=()=>setLignes([...lignes,{desc:"",qte:1,pu:0}]);
-  const updLigne=(i,field,val)=>setLignes(lignes.map((l,idx)=>idx===i?{...l,[field]:field==="qte"||field==="pu"?Number(val):val}:l));
+  const addLigne=()=>setLignes([...lignes,{desc:"",cat:"iphones",qte:1,pu:0,details:{}}]);
+
+  const updLigne=(i,field,val)=>setLignes(lignes.map((l,idx)=>{
+    if(idx!==i)return l;
+    if(field==="cat") return {...l,cat:val,desc:"",pu:0,details:{}};
+    if(field==="produit"){
+      const p=stock.find(x=>x.nom===val);
+      return {...l,desc:val,pu:p?p.prix_vente:l.pu};
+    }
+    if(field==="qte"||field==="pu") return {...l,[field]:Number(val)};
+    return {...l,[field]:val};
+  }));
+
+  const updDetail=(i,key,val)=>setLignes(lignes.map((l,idx)=>idx===i?{...l,details:{...l.details,[key]:val}}:l));
   const delLigne=i=>setLignes(lignes.filter((_,idx)=>idx!==i));
 
   const creerFacture=async()=>{
@@ -669,7 +689,7 @@ function Factures({factures,setFactures,stock,showToast}) {
       setPreview(rows[0]);
       setShow(false);
       setForm({client:"",email:"",telephone:"",adresse:"",date:today(),note:""});
-      setLignes([{desc:"",qte:1,pu:0}]);
+      setLignes([{desc:"",cat:"iphones",qte:1,pu:0,details:{}}]);
       showToast("Facture créée ✓");
     }catch(e){showToast("Erreur: "+e.message,true);}
     setLoading(false);
@@ -679,17 +699,21 @@ function Factures({factures,setFactures,stock,showToast}) {
     const content=printRef.current.innerHTML;
     const w=window.open("","_blank");
     w.document.write(`<html><head><title>Facture Angy Company</title><style>
+      *{box-sizing:border-box;}
       body{font-family:Arial,sans-serif;margin:0;padding:40px;color:#1C1C1E;}
       table{width:100%;border-collapse:collapse;}
-      th{background:#f5f5f7;padding:10px;text-align:left;font-size:12px;}
+      th{background:#f5f5f7;padding:10px;text-align:left;font-size:12px;font-weight:700;}
       td{padding:10px;border-bottom:1px solid #e5e5ea;font-size:13px;}
-      .total{font-size:20px;font-weight:800;color:#0A84FF;}
+      .details{font-size:11px;color:#636366;margin-top:3px;}
     </style></head><body>${content}</body></html>`);
     w.document.close();
     w.print();
   };
 
   const del=async(id)=>{await dbDel("factures",id);setFactures(factures.filter(f=>f.id!==id));if(preview?.id===id)setPreview(null);showToast("Supprimée");};
+
+  // Produits par catégorie
+  const produitsByCat=(cat)=>stock.filter(p=>p.cat===cat);
 
   return (
     <div>
@@ -714,22 +738,83 @@ function Factures({factures,setFactures,stock,showToast}) {
             <Inp label="Note" value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="Merci pour votre confiance"/>
           </div>
 
-          {/* Lignes */}
-          <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>Articles</div>
+          {/* Lignes articles */}
+          <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:12}}>Articles</div>
           <div style={{marginBottom:12}}>
-            {lignes.map((l,i)=>(
-              <div key={i} style={{display:"grid",gridTemplateColumns:"3fr 1fr 1fr auto",gap:8,marginBottom:8,alignItems:"center"}}>
-                <Inp value={l.desc} onChange={e=>updLigne(i,"desc",e.target.value)} placeholder="Description de l'article"/>
-                <Inp type="number" value={l.qte} onChange={e=>updLigne(i,"qte",e.target.value)} placeholder="Qté"/>
-                <Inp type="number" value={l.pu} onChange={e=>updLigne(i,"pu",e.target.value)} placeholder="Prix unit."/>
-                <button onClick={()=>delLigne(i)} style={{background:"none",border:`1px solid ${theme.border}`,color:"#FF453A",padding:"9px 10px",borderRadius:9,cursor:"pointer",fontSize:14}}>✕</button>
-              </div>
-            ))}
-            <button onClick={addLigne} style={{background:"none",border:`1px dashed ${theme.border}`,color:theme.textMuted,padding:"8px 16px",borderRadius:9,cursor:"pointer",fontSize:13,fontFamily:"inherit",width:"100%"}}>+ Ajouter un article</button>
+            {lignes.map((l,i)=>{
+              const champs=CHAMPS_CAT[l.cat]||[];
+              const produits=produitsByCat(l.cat);
+              return (
+                <div key={i} style={{background:theme.bg,borderRadius:12,padding:14,marginBottom:12,border:`1px solid ${theme.border}`}}>
+                  {/* Ligne principale */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px 100px auto",gap:8,marginBottom:champs.length>0?10:0,alignItems:"end"}}>
+                    {/* Catégorie */}
+                    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                      <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Catégorie</label>
+                      <select value={l.cat} onChange={e=>updLigne(i,"cat",e.target.value)}
+                        style={{background:theme.sel,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",cursor:"pointer"}}>
+                        {CAT_STK.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                      </select>
+                    </div>
+                    {/* Produit */}
+                    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                      <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Produit</label>
+                      {produits.length>0?(
+                        <select value={l.desc} onChange={e=>updLigne(i,"produit",e.target.value)}
+                          style={{background:theme.sel,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",cursor:"pointer"}}>
+                          <option value="">-- Choisir --</option>
+                          {produits.map(p=><option key={p.id} value={p.nom}>{p.nom} ({xof(p.prix_vente)})</option>)}
+                        </select>
+                      ):(
+                        <input value={l.desc} onChange={e=>updLigne(i,"desc",e.target.value)} placeholder="Description"
+                          style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                      )}
+                    </div>
+                    {/* Quantité */}
+                    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                      <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Qté</label>
+                      <input type="number" value={l.qte} onChange={e=>updLigne(i,"qte",e.target.value)} min="1"
+                        style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                    </div>
+                    {/* Prix */}
+                    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                      <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Prix (FCFA)</label>
+                      <input type="number" value={l.pu} onChange={e=>updLigne(i,"pu",e.target.value)}
+                        style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                    </div>
+                    {/* Supprimer */}
+                    <button onClick={()=>delLigne(i)}
+                      style={{background:"none",border:`1px solid ${theme.border}`,color:"#FF453A",padding:"8px 10px",borderRadius:8,cursor:"pointer",fontSize:14,alignSelf:"flex-end"}}>✕</button>
+                  </div>
+
+                  {/* Champs spéciaux selon catégorie */}
+                  {champs.length>0&&(
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8}}>
+                      {champs.map(c=>(
+                        <div key={c.key} style={{display:"flex",flexDirection:"column",gap:4}}>
+                          <label style={{fontSize:11,fontWeight:600,color:"#0A84FF"}}>{c.label}</label>
+                          <input value={l.details[c.key]||""} onChange={e=>updDetail(i,c.key,e.target.value)} placeholder={c.placeholder}
+                            style={{background:theme.input,border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"7px 10px",color:theme.text,fontSize:12,fontFamily:"inherit",outline:"none"}}/>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Sous-total ligne */}
+                  {l.desc&&<div style={{textAlign:"right",marginTop:8,fontSize:13,fontWeight:700,color:"#30D158"}}>
+                    Sous-total : {xof(l.qte*l.pu)}
+                  </div>}
+                </div>
+              );
+            })}
+            <button onClick={addLigne}
+              style={{background:"none",border:`1px dashed ${theme.border}`,color:theme.textMuted,padding:"10px 16px",borderRadius:10,cursor:"pointer",fontSize:13,fontFamily:"inherit",width:"100%"}}>
+              + Ajouter un article
+            </button>
           </div>
 
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontSize:18,fontWeight:800,color:"#0A84FF"}}>Total : {xof(totalLignes)}</div>
+            <div style={{fontSize:20,fontWeight:800,color:"#0A84FF"}}>Total : {xof(totalLignes)}</div>
             <BtnPri onClick={creerFacture} style={{opacity:loading?0.6:1}}>{loading?"Création...":"Créer la facture"}</BtnPri>
           </div>
         </Card>
@@ -741,7 +826,7 @@ function Factures({factures,setFactures,stock,showToast}) {
         return (
           <Card style={{marginBottom:20,border:"1px solid rgba(191,90,242,0.3)"}}>
             <div ref={printRef} style={{background:"#fff",color:"#1C1C1E",padding:"40px",borderRadius:12,fontFamily:"Arial,sans-serif"}}>
-              {/* Header facture */}
+              {/* Header */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32,paddingBottom:24,borderBottom:"3px solid #1400FF"}}>
                 <div>
                   <AngyLogo height={40} forPrint={true}/>
@@ -760,7 +845,7 @@ function Factures({factures,setFactures,stock,showToast}) {
               {/* Client */}
               <div style={{marginBottom:28}}>
                 <div style={{fontSize:11,fontWeight:700,color:"#636366",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Facturé à</div>
-                <div style={{fontSize:16,fontWeight:700,color:"#1C1C1E"}}>{preview.client}</div>
+                <div style={{fontSize:16,fontWeight:700}}>{preview.client}</div>
                 {preview.telephone&&<div style={{fontSize:13,color:"#636366"}}>📞 {preview.telephone}</div>}
                 {preview.email&&<div style={{fontSize:13,color:"#636366"}}>✉️ {preview.email}</div>}
                 {preview.adresse&&<div style={{fontSize:13,color:"#636366"}}>📍 {preview.adresse}</div>}
@@ -770,21 +855,26 @@ function Factures({factures,setFactures,stock,showToast}) {
               <table style={{width:"100%",borderCollapse:"collapse",marginBottom:24}}>
                 <thead>
                   <tr style={{background:"#f5f5f7"}}>
-                    <th style={{padding:"10px 12px",textAlign:"left",fontSize:12,fontWeight:700,color:"#636366",textTransform:"uppercase"}}>Description</th>
-                    <th style={{padding:"10px 12px",textAlign:"center",fontSize:12,fontWeight:700,color:"#636366",textTransform:"uppercase"}}>Qté</th>
-                    <th style={{padding:"10px 12px",textAlign:"right",fontSize:12,fontWeight:700,color:"#636366",textTransform:"uppercase"}}>Prix unit.</th>
-                    <th style={{padding:"10px 12px",textAlign:"right",fontSize:12,fontWeight:700,color:"#636366",textTransform:"uppercase"}}>Total</th>
+                    {["Description","Détails","Qté","Prix unit.","Total"].map(h=>(
+                      <th key={h} style={{padding:"10px 12px",textAlign:"left",fontSize:12,fontWeight:700,color:"#636366",textTransform:"uppercase"}}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {lignesParsed.map((l,i)=>(
-                    <tr key={i} style={{borderBottom:"1px solid #e5e5ea"}}>
-                      <td style={{padding:"12px",fontSize:14,color:"#1C1C1E"}}>{l.desc}</td>
-                      <td style={{padding:"12px",fontSize:14,textAlign:"center",color:"#636366"}}>{l.qte}</td>
-                      <td style={{padding:"12px",fontSize:14,textAlign:"right",color:"#636366"}}>{xof(l.pu)}</td>
-                      <td style={{padding:"12px",fontSize:14,textAlign:"right",fontWeight:700,color:"#1C1C1E"}}>{xof(l.qte*l.pu)}</td>
-                    </tr>
-                  ))}
+                  {lignesParsed.map((l,i)=>{
+                    const champs=CHAMPS_CAT[l.cat]||[];
+                    const details=l.details||{};
+                    const detailStr=champs.filter(c=>details[c.key]).map(c=>`${c.label}: ${details[c.key]}`).join(" · ");
+                    return (
+                      <tr key={i} style={{borderBottom:"1px solid #e5e5ea"}}>
+                        <td style={{padding:"12px",fontSize:14,fontWeight:600}}>{l.desc}</td>
+                        <td style={{padding:"12px",fontSize:12,color:"#636366"}}>{detailStr||"—"}</td>
+                        <td style={{padding:"12px",fontSize:14,textAlign:"center",color:"#636366"}}>{l.qte}</td>
+                        <td style={{padding:"12px",fontSize:14,textAlign:"right",color:"#636366"}}>{xof(l.pu)}</td>
+                        <td style={{padding:"12px",fontSize:14,textAlign:"right",fontWeight:700}}>{xof(l.qte*l.pu)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 
@@ -792,20 +882,17 @@ function Factures({factures,setFactures,stock,showToast}) {
               <div style={{display:"flex",justifyContent:"flex-end",marginBottom:24}}>
                 <div style={{background:"#f5f5f7",borderRadius:12,padding:"16px 24px",textAlign:"right"}}>
                   <div style={{fontSize:13,color:"#636366",marginBottom:4}}>Total TTC</div>
-                  <div style={{fontSize:28,fontWeight:900,color:"#0A84FF",letterSpacing:"-1px"}}>{xof(preview.total)}</div>
+                  <div style={{fontSize:28,fontWeight:900,color:"#0A84FF"}}>{xof(preview.total)}</div>
                 </div>
               </div>
 
-              {/* Note */}
               {preview.note&&<div style={{borderTop:"1px solid #e5e5ea",paddingTop:16,fontSize:13,color:"#636366",fontStyle:"italic"}}>{preview.note}</div>}
-
-              {/* Footer */}
               <div style={{marginTop:32,paddingTop:16,borderTop:"2px solid #CC0000",textAlign:"center",fontSize:11,color:"#8E8E93"}}>
                 Angy Company · Parcelles Assainies U18, Dakar · +221 71 053 89 17 · Merci pour votre confiance 🙏
               </div>
             </div>
             <div style={{display:"flex",gap:10,marginTop:16}}>
-              <BtnPri onClick={imprimer}>🖨️ Imprimer / Télécharger PDF</BtnPri>
+              <BtnPri onClick={imprimer}>🖨️ Imprimer / PDF</BtnPri>
               <BtnSec onClick={()=>setPreview(null)}>Fermer</BtnSec>
             </div>
           </Card>
