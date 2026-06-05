@@ -387,13 +387,21 @@ function Depenses({depenses,setDepenses,catDep,showToast}) {
     setLoading(false);
   };
   const del=async(id)=>{await dbDel("depenses",id);setDepenses(depenses.filter(d=>d.id!==id));showToast("Supprimée");};
+  const [editId,setEditId]=useState(null);
+  const [editForm,setEditForm]=useState({});
   const chStat=async(id,statut)=>{await dbPatch("depenses",id,{statut});setDepenses(depenses.map(d=>d.id===id?{...d,statut}:d));showToast("Statut mis à jour");};
+  const startEdit=(d)=>{setEditId(d.id);setEditForm({titre:d.titre,cat:d.cat,montant:d.montant,date:d.date,statut:d.statut,note:d.note||""});setShow(false);};
+  const saveEdit=async()=>{
+    await dbPatch("depenses",editId,{...editForm,montant:parseInt(editForm.montant)});
+    setDepenses(depenses.map(d=>d.id===editId?{...d,...editForm,montant:parseInt(editForm.montant)}:d));
+    setEditId(null);showToast("Dépense modifiée ✓");
+  };
 
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>Dépenses</h1>
-        <BtnPri onClick={()=>setShow(!show)}>{show?"✕ Annuler":"+ Nouvelle dépense"}</BtnPri>
+        <BtnPri onClick={()=>{setShow(!show);setEditId(null);}}>{show?"✕ Annuler":"+ Nouvelle dépense"}</BtnPri>
       </div>
       {show&&(
         <Card style={{marginBottom:16}}>
@@ -407,6 +415,23 @@ function Depenses({depenses,setDepenses,catDep,showToast}) {
             <Inp label="Note" value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="Optionnel"/>
           </div>
           <BtnPri onClick={add} style={{opacity:loading?0.6:1}}>{loading?"Enregistrement...":"Enregistrer"}</BtnPri>
+        </Card>
+      )}
+      {editId&&(
+        <Card style={{marginBottom:16,borderColor:"rgba(255,159,10,0.4)"}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#FF9F0A",marginBottom:14}}>✏️ Modifier la dépense</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
+            <Inp label="Titre *" value={editForm.titre} onChange={e=>setEditForm({...editForm,titre:e.target.value})}/>
+            <Inp label="Montant (FCFA) *" type="number" value={editForm.montant} onChange={e=>setEditForm({...editForm,montant:e.target.value})}/>
+            <SelInput label="Catégorie" value={editForm.cat} onChange={e=>setEditForm({...editForm,cat:e.target.value})} options={catDep.map(c=>({v:c.id,l:`${c.icon} ${c.label}`}))}/>
+            <Inp label="Date" type="date" value={editForm.date} onChange={e=>setEditForm({...editForm,date:e.target.value})}/>
+            <SelInput label="Statut" value={editForm.statut} onChange={e=>setEditForm({...editForm,statut:e.target.value})} options={["En attente","Approuvée","Rejetée"].map(s=>({v:s,l:s}))}/>
+            <Inp label="Note" value={editForm.note} onChange={e=>setEditForm({...editForm,note:e.target.value})}/>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <BtnPri onClick={saveEdit}>💾 Sauvegarder</BtnPri>
+            <BtnSec onClick={()=>setEditId(null)}>Annuler</BtnSec>
+          </div>
         </Card>
       )}
       <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
@@ -428,7 +453,7 @@ function Depenses({depenses,setDepenses,catDep,showToast}) {
             {filtered.map(d=>{
               const cat=getCat(catDep,d.cat);
               return (
-                <tr key={d.id}>
+                <tr key={d.id} style={{background:editId===d.id?"rgba(255,159,10,0.05)":"transparent"}}>
                   <Td><strong style={{color:theme.text}}>{d.titre}</strong>{d.note&&<div style={{fontSize:11,color:theme.textMuted}}>{d.note}</div>}</Td>
                   <Td><span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:99,fontSize:11,fontWeight:600,background:cat.color+"22",color:cat.color}}>{cat.icon} {cat.label}</span></Td>
                   <Td style={{color:theme.textMuted,fontSize:13}}>{d.date}</Td>
@@ -436,6 +461,7 @@ function Depenses({depenses,setDepenses,catDep,showToast}) {
                   <Td><Badge s={d.statut}/></Td>
                   <Td>
                     <div style={{display:"flex",gap:6}}>
+                      <button style={{background:"rgba(255,159,10,0.12)",border:"1px solid #FF9F0A",color:"#FF9F0A",padding:"4px 8px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}} onClick={()=>startEdit(d)}>✏️</button>
                       {d.statut!=="Approuvée"&&<button style={{background:"none",border:"1px solid #30D158",color:"#30D158",padding:"4px 8px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}} onClick={()=>chStat(d.id,"Approuvée")}>✓</button>}
                       {d.statut!=="Rejetée"&&<button style={{background:"none",border:"1px solid #FF453A",color:"#FF453A",padding:"4px 8px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}} onClick={()=>chStat(d.id,"Rejetée")}>✕</button>}
                       <button style={{background:"none",border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"4px 8px",borderRadius:7,cursor:"pointer",fontSize:12,fontFamily:"inherit"}} onClick={()=>del(d.id)}>🗑</button>
@@ -460,8 +486,17 @@ function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
   const [vf,setVf]=useState({qte:"",client:"",date:today()});
   const [fCat,setFCat]=useState("all");
   const [loading,setLoading]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [editForm,setEditForm]=useState({});
 
   const filtered=stock.filter(p=>fCat==="all"||p.cat===fCat);
+
+  const startEdit=(p)=>{setEditId(p.id);setEditForm({nom:p.nom,cat:p.cat,qte:p.qte,prix_achat:p.prix_achat,prix_vente:p.prix_vente,seuil:p.seuil});setShowAdd(false);setShowVente(null);};
+  const saveEdit=async()=>{
+    await dbPatch("stock",editId,{nom:editForm.nom,cat:editForm.cat,qte:parseInt(editForm.qte),prix_achat:parseInt(editForm.prix_achat),prix_vente:parseInt(editForm.prix_vente),seuil:parseInt(editForm.seuil)||0});
+    setStock(stock.map(p=>p.id===editId?{...p,...editForm,qte:parseInt(editForm.qte),prix_achat:parseInt(editForm.prix_achat),prix_vente:parseInt(editForm.prix_vente),seuil:parseInt(editForm.seuil)||0}:p));
+    setEditId(null);showToast("Produit modifié ✓");
+  };
 
   const addProd=async()=>{
     if(!form.nom||!form.qte||!form.prix_achat||!form.prix_vente)return showToast("Remplissez tous les champs",true);
@@ -536,6 +571,23 @@ function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
           </Card>
         ):null;
       })()}
+      {editId&&(
+        <Card style={{marginBottom:16,borderColor:"rgba(255,159,10,0.4)"}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#FF9F0A",marginBottom:14}}>✏️ Modifier le produit</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:12}}>
+            <Inp label="Nom *" value={editForm.nom} onChange={e=>setEditForm({...editForm,nom:e.target.value})}/>
+            <SelInput label="Catégorie" value={editForm.cat} onChange={e=>setEditForm({...editForm,cat:e.target.value})} options={catStk.map(c=>({v:c.id,l:`${c.icon} ${c.label}`}))}/>
+            <Inp label="Quantité" type="number" value={editForm.qte} onChange={e=>setEditForm({...editForm,qte:e.target.value})}/>
+            <Inp label="Prix achat (FCFA)" type="number" value={editForm.prix_achat} onChange={e=>setEditForm({...editForm,prix_achat:e.target.value})}/>
+            <Inp label="Prix vente (FCFA)" type="number" value={editForm.prix_vente} onChange={e=>setEditForm({...editForm,prix_vente:e.target.value})}/>
+            <Inp label="Seuil alerte" type="number" value={editForm.seuil} onChange={e=>setEditForm({...editForm,seuil:e.target.value})}/>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <BtnPri onClick={saveEdit}>💾 Sauvegarder</BtnPri>
+            <BtnSec onClick={()=>setEditId(null)}>Annuler</BtnSec>
+          </div>
+        </Card>
+      )}
       <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
         <SelFilter value={fCat} onChange={e=>setFCat(e.target.value)}>
           <option value="all">Toutes catégories</option>
@@ -553,7 +605,7 @@ function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
               const marge=Math.round(((p.prix_vente-p.prix_achat)/p.prix_achat)*100);
               const bas=p.qte<=p.seuil;
               return (
-                <tr key={p.id}>
+                <tr key={p.id} style={{background:editId===p.id?"rgba(255,159,10,0.05)":"transparent"}}>
                   <Td><strong style={{color:theme.text}}>{p.nom}</strong></Td>
                   <Td style={{color:theme.textSub}}>{cat.icon} {cat.label}</Td>
                   <Td>
@@ -569,6 +621,7 @@ function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
                   <Td>{p.qte===0?<span style={{color:"#FF453A",fontWeight:700,fontSize:12}}>RUPTURE</span>:bas?<span style={{color:"#FF9F0A",fontWeight:700,fontSize:12}}>⚠️ BAS</span>:<span style={{color:"#30D158",fontSize:12}}>✓ OK</span>}</Td>
                   <Td>
                     <div style={{display:"flex",gap:6}}>
+                      <button style={{background:"rgba(255,159,10,0.12)",border:"1px solid #FF9F0A",color:"#FF9F0A",padding:"4px 8px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}} onClick={()=>startEdit(p)}>✏️</button>
                       <button style={{background:"rgba(48,209,88,0.12)",border:"1px solid #30D158",color:"#30D158",padding:"4px 10px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}} onClick={()=>setShowVente(p.id)}>💸 Vendre</button>
                       <button style={{background:"none",border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"4px 8px",borderRadius:7,cursor:"pointer",fontSize:12,fontFamily:"inherit"}} onClick={()=>del(p.id)}>🗑</button>
                     </div>
