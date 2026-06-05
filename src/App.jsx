@@ -367,14 +367,21 @@ function Categories({catDep,setCatDep,catStk,setCatStk,showToast}) {
   );
 }
 
+// ─── Catégories qui vont dans le stock ───────────────────────────────────────
+const CATS_STOCK = ["iphones","accessoires","ordinateurs","pieces"];
+
 // ─── Dépenses ─────────────────────────────────────────────────────────────────
-function Depenses({depenses,setDepenses,catDep,showToast}) {
+function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast}) {
   const {theme}=useTheme();
   const [fCat,setFCat]=useState("all");
   const [fStat,setFStat]=useState("all");
   const [show,setShow]=useState(false);
   const [loading,setLoading]=useState(false);
+  const [ajouterStock,setAjouterStock]=useState(false);
+  const [stockForm,setStockForm]=useState({qte:"",prix_vente:"",seuil:"3"});
   const [form,setForm]=useState({titre:"",cat:catDep[0]?.id||"iphones",montant:"",date:today(),statut:"En attente",note:""});
+
+  const isStockCat = CATS_STOCK.includes(form.cat);
 
   const filtered=depenses.filter(d=>(fCat==="all"||d.cat===fCat)&&(fStat==="all"||d.statut===fStat));
   const total=filtered.filter(d=>d.statut==="Approuvée").reduce((s,d)=>s+d.montant,0);
@@ -385,9 +392,28 @@ function Depenses({depenses,setDepenses,catDep,showToast}) {
     try{
       const rows=await dbAdd("depenses",{titre:form.titre,cat:form.cat,montant:parseInt(form.montant),date:form.date,statut:form.statut,note:form.note});
       setDepenses([rows[0],...depenses]);
+
+      // Ajouter au stock si catégorie produit
+      if(isStockCat && ajouterStock && stockForm.qte){
+        const existant=stock.find(p=>p.nom===form.titre&&p.cat===form.cat);
+        if(existant){
+          const nq=existant.qte+parseInt(stockForm.qte);
+          await dbPatch("stock",existant.id,{qte:nq});
+          setStock(stock.map(p=>p.id===existant.id?{...p,qte:nq}:p));
+          showToast("Dépense + Stock mis à jour ✓");
+        } else {
+          const sRows=await dbAdd("stock",{nom:form.titre,cat:form.cat,qte:parseInt(stockForm.qte),prix_achat:parseInt(form.montant/parseInt(stockForm.qte)),prix_vente:parseInt(stockForm.prix_vente)||0,seuil:parseInt(stockForm.seuil)||3});
+          setStock([sRows[0],...stock]);
+          showToast("Dépense + Nouveau produit en stock ✓");
+        }
+      } else {
+        showToast("Dépense enregistrée ✓");
+      }
+
       setForm({titre:"",cat:catDep[0]?.id||"iphones",montant:"",date:today(),statut:"En attente",note:""});
+      setStockForm({qte:"",prix_vente:"",seuil:"3"});
+      setAjouterStock(false);
       setShow(false);
-      showToast("Dépense enregistrée ✓");
     }catch(e){showToast("Erreur",true);}
     setLoading(false);
   };
@@ -420,6 +446,28 @@ function Depenses({depenses,setDepenses,catDep,showToast}) {
             <Inp label="Note" value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="Optionnel"/>
           </div>
           <BtnPri onClick={add} style={{opacity:loading?0.6:1}}>{loading?"Enregistrement...":"Enregistrer"}</BtnPri>
+        </Card>
+      )}
+      {/* Option ajout au stock pour catégories produits */}
+      {show && isStockCat && (
+        <Card style={{marginBottom:16,borderColor:ajouterStock?"rgba(10,132,255,0.3)":undefined}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:ajouterStock?14:0}}
+            onClick={()=>setAjouterStock(!ajouterStock)}>
+            <div style={{width:20,height:20,borderRadius:6,background:ajouterStock?"#0A84FF":theme.toggleBg,border:`2px solid ${ajouterStock?"#0A84FF":theme.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {ajouterStock&&<span style={{color:"#fff",fontSize:13,fontWeight:900}}>✓</span>}
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:theme.text}}>📦 Ajouter automatiquement au stock</div>
+              <div style={{fontSize:11,color:theme.textMuted}}>Ce produit sera ajouté à votre inventaire</div>
+            </div>
+          </div>
+          {ajouterStock&&(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+              <Inp label="Quantité *" type="number" value={stockForm.qte} onChange={e=>setStockForm({...stockForm,qte:e.target.value})} placeholder="Ex: 5"/>
+              <Inp label="Prix de vente (FCFA)" type="number" value={stockForm.prix_vente} onChange={e=>setStockForm({...stockForm,prix_vente:e.target.value})} placeholder="Ex: 580000"/>
+              <Inp label="Seuil alerte" type="number" value={stockForm.seuil} onChange={e=>setStockForm({...stockForm,seuil:e.target.value})} placeholder="3"/>
+            </div>
+          )}
         </Card>
       )}
       {editId&&(
@@ -483,12 +531,12 @@ function Depenses({depenses,setDepenses,catDep,showToast}) {
 }
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
-function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
+function Stock({stock,setStock,ventes,setVentes,factures,setFactures,catStk,showToast,setPage}) {
   const {theme}=useTheme();
   const [showAdd,setShowAdd]=useState(false);
   const [showVente,setShowVente]=useState(null);
   const [form,setForm]=useState({nom:"",cat:catStk[0]?.id||"iphones",qte:"",prix_achat:"",prix_vente:"",seuil:""});
-  const [vf,setVf]=useState({qte:"",client:"",date:today()});
+  const [vf,setVf]=useState({qte:"",client:"",telephone:"",date:today(),creerFacture:true});
   const [fCat,setFCat]=useState("all");
   const [loading,setLoading]=useState(false);
   const [editId,setEditId]=useState(null);
@@ -523,12 +571,24 @@ function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
     setLoading(true);
     try{
       await dbPatch("stock",p.id,{qte:p.qte-q});
-      const rows=await dbAdd("ventes",{produit:p.nom,cat:p.cat,qte:q,prix_vente:p.prix_vente,date:vf.date,client:vf.client||"—"});
+      const venteRows=await dbAdd("ventes",{produit:p.nom,cat:p.cat,qte:q,prix_vente:p.prix_vente,date:vf.date,client:vf.client||"—"});
       setStock(stock.map(x=>x.id===showVente?{...x,qte:x.qte-q}:x));
-      setVentes([rows[0],...ventes]);
-      setVf({qte:"",client:"",date:today()});
+      setVentes([venteRows[0],...ventes]);
+
+      // Créer facture automatiquement si demandé
+      if(vf.creerFacture){
+        const numero=`FAC-${new Date().getFullYear()}-${String(factures.length+1).padStart(3,"0")}`;
+        const lignes=JSON.stringify([{desc:p.nom,cat:p.cat,qte:q,pu:p.prix_vente,details:{}}]);
+        const factRows=await dbAdd("factures",{numero,client:vf.client||"—",email:"",telephone:vf.telephone||"",adresse:"",date:vf.date,note:"Merci pour votre confiance",lignes,total:q*p.prix_vente});
+        setFactures([factRows[0],...factures]);
+        showToast("Vente + Facture créées ✓");
+        setPage("factures");
+      } else {
+        showToast("Vente enregistrée ✓");
+      }
+
+      setVf({qte:"",client:"",telephone:"",date:today(),creerFacture:true});
       setShowVente(null);
-      showToast("Vente enregistrée ✓");
     }catch(e){showToast("Erreur",true);}
     setLoading(false);
   };
@@ -562,16 +622,28 @@ function Stock({stock,setStock,ventes,setVentes,catStk,showToast}) {
             <div style={{fontSize:14,fontWeight:700,color:"#30D158",marginBottom:14}}>💸 Vente — {p.nom}</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:12}}>
               <Inp label={`Quantité (max: ${p.qte})`} type="number" value={vf.qte} onChange={e=>setVf({...vf,qte:e.target.value})} placeholder="1"/>
-              <Inp label="Client" value={vf.client} onChange={e=>setVf({...vf,client:e.target.value})} placeholder="Nom du client"/>
+              <Inp label="Nom du client" value={vf.client} onChange={e=>setVf({...vf,client:e.target.value})} placeholder="Nom du client"/>
+              <Inp label="Téléphone client" value={vf.telephone} onChange={e=>setVf({...vf,telephone:e.target.value})} placeholder="+221 77 000 00 00"/>
               <Inp label="Date" type="date" value={vf.date} onChange={e=>setVf({...vf,date:e.target.value})}/>
             </div>
             <div style={{fontSize:13,color:theme.textMuted,marginBottom:12}}>
               Prix unitaire : <strong style={{color:"#30D158"}}>{xof(p.prix_vente)}</strong>
               {vf.qte&&<> — Total : <strong style={{color:"#30D158"}}>{xof(parseInt(vf.qte||0)*p.prix_vente)}</strong></>}
             </div>
+            {/* Option facture automatique */}
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:10,background:vf.creerFacture?"rgba(48,209,88,0.08)":"rgba(255,255,255,0.04)",border:`1px solid ${vf.creerFacture?"rgba(48,209,88,0.3)":theme.border}`,marginBottom:14,cursor:"pointer"}}
+              onClick={()=>setVf({...vf,creerFacture:!vf.creerFacture})}>
+              <div style={{width:20,height:20,borderRadius:6,background:vf.creerFacture?"#30D158":theme.toggleBg,border:`2px solid ${vf.creerFacture?"#30D158":theme.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {vf.creerFacture&&<span style={{color:"#fff",fontSize:13,fontWeight:900}}>✓</span>}
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:theme.text}}>Créer une facture automatiquement</div>
+                <div style={{fontSize:11,color:theme.textMuted}}>Une facture sera générée et prête à imprimer</div>
+              </div>
+            </div>
             <div style={{display:"flex",gap:10}}>
-              <BtnPri onClick={vendre} style={{opacity:loading?0.6:1}}>{loading?"...":"Confirmer la vente"}</BtnPri>
-              <BtnSec onClick={()=>{setShowVente(null);setVf({qte:"",client:"",date:today()});}}>Annuler</BtnSec>
+              <BtnPri onClick={vendre} style={{opacity:loading?0.6:1}}>{loading?"...":`${vf.creerFacture?"Vendre + Facturer":"Confirmer la vente"}`}</BtnPri>
+              <BtnSec onClick={()=>{setShowVente(null);setVf({qte:"",client:"",telephone:"",date:today(),creerFacture:true});}}>Annuler</BtnSec>
             </div>
           </Card>
         ):null;
@@ -1093,8 +1165,8 @@ export default function App() {
           {loading?<div style={{textAlign:"center",padding:"60px",fontSize:32}}>⏳</div>:(
             <>
               {page==="dashboard"  &&<Dashboard   depenses={depenses} stock={stock} ventes={ventes} factures={factures}/>}
-              {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} showToast={showToast}/>}
-              {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} catStk={catStk} showToast={showToast}/>}
+              {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} stock={stock} setStock={setStock} showToast={showToast}/>}
+              {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} catStk={catStk} showToast={showToast} setPage={setPage}/>}
               {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
