@@ -649,6 +649,13 @@ const CHAMPS_CAT = {
   pieces:      [{key:"ref",label:"Référence",placeholder:"Ex: BAT-IP13-001"},{key:"compatible",label:"Compatible avec",placeholder:"Ex: iPhone 13 / 13 Pro"}],
 };
 
+const CATS_FACTURE = [
+  {id:"iphones",label:"iPhones",icon:"📱"},
+  {id:"accessoires",label:"Accessoires",icon:"🎧"},
+  {id:"ordinateurs",label:"Ordinateurs",icon:"💻"},
+  {id:"pieces",label:"Pièces",icon:"🔧"},
+];
+
 // ─── Factures ─────────────────────────────────────────────────────────────────
 function Factures({factures,setFactures,stock,showToast}) {
   const {theme}=useTheme();
@@ -753,7 +760,7 @@ function Factures({factures,setFactures,stock,showToast}) {
                       <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Catégorie</label>
                       <select value={l.cat} onChange={e=>updLigne(i,"cat",e.target.value)}
                         style={{background:theme.sel,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",cursor:"pointer"}}>
-                        {CAT_STK.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                        {CATS_FACTURE.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
                       </select>
                     </div>
                     {/* Produit */}
