@@ -33,22 +33,27 @@ const LIGHT = {
 };
 
 // ─── Logo SVG ─────────────────────────────────────────────────────────────────
-const AngyLogo = ({height=36,forPrint=false}) => {
+const AngyLogo = ({height=50,forPrint=false}) => {
   const ctx = useContext(ThemeCtx);
-  const c = forPrint ? "#1C1C1E" : (ctx ? ctx.theme.logoText : "#1C1C1E");
+  const dark = ctx ? ctx.dark : false;
+  const textColor = forPrint ? "#1C1C1E" : (dark ? "#ffffff" : "#1C1C1E");
   return (
-    <svg height={height} viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="18" width="10" height="48" fill="#1400FF"/>
-      <rect x="0" y="56" width="52" height="10" fill="#1400FF"/>
-      {[["A",32],["N",64],["G",96],["Y",128]].map(([l,cx])=>(
+    <svg height={height} viewBox="0 0 420 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Crochet bleu — bas gauche */}
+      <rect x="10" y="20" width="12" height="65" fill="#1400FF"/>
+      <rect x="10" y="73" width="60" height="12" fill="#1400FF"/>
+      {/* Crochet rouge — haut droite */}
+      <rect x="408" y="20" width="12" height="50" fill="#CC0000"/>
+      <rect x="350" y="20" width="70" height="12" fill="#CC0000"/>
+      {/* Cercles ANGY avec fond blanc et bordure noire */}
+      {[["A",50],["N",90],["G",130],["Y",170]].map(([l,cx])=>(
         <g key={l}>
-          <circle cx={cx} cy="40" r="18" stroke={c} strokeWidth="2.5" fill="none"/>
-          <text x={cx} y="46" textAnchor="middle" fontFamily="Arial Black,Impact,sans-serif" fontWeight="900" fontSize="17" fill={c}>{l}</text>
+          <circle cx={cx} cy="50" r="22" fill="white" stroke="#1C1C1E" strokeWidth="3"/>
+          <text x={cx} y="57" textAnchor="middle" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="20" fill="#1C1C1E">{l}</text>
         </g>
       ))}
-      <text x="163" y="48" fontFamily="Arial Black,Impact,sans-serif" fontWeight="900" fontSize="26" fill={c}>Company</text>
-      <rect x="310" y="18" width="10" height="38" fill="#CC0000"/>
-      <rect x="268" y="18" width="52" height="10" fill="#CC0000"/>
+      {/* Company */}
+      <text x="207" y="60" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="32" fill={textColor}>Company</text>
     </svg>
   );
 };
@@ -965,15 +970,20 @@ export default function App() {
   return (
     <ThemeCtx.Provider value={{dark,toggle:()=>setDark(d=>!d),theme}}>
       <div style={{minHeight:"100vh",background:theme.bg,color:theme.text,fontFamily:"'SF Pro Display','Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column",transition:"background 0.25s,color 0.25s"}}>
-        <header style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 28px",background:theme.bgHeader,backdropFilter:"blur(20px)",borderBottom:`1px solid ${theme.border}`,position:"sticky",top:0,zIndex:100,boxShadow:theme.shadow,transition:"background 0.25s"}}>
-          <div style={{display:"flex",alignItems:"center",gap:16}}>
-            <AngyLogo height={36}/>
-            <div style={{fontSize:10,color:theme.textMuted,borderLeft:`1px solid ${theme.border}`,paddingLeft:12}}>📍 Parcelles Assainies U18, Dakar</div>
+        <header style={{background:theme.bgHeader,backdropFilter:"blur(20px)",borderBottom:`1px solid ${theme.border}`,position:"sticky",top:0,zIndex:100,boxShadow:theme.shadow,transition:"background 0.25s"}}>
+          {/* Ligne 1 : Logo + Toggle */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px"}}>
+            <AngyLogo height={52}/>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{fontSize:11,color:theme.textMuted}}>📍 Parcelles Assainies U18, Dakar</div>
+              <ThemeToggle/>
+            </div>
           </div>
-          <nav style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {/* Ligne 2 : Navigation */}
+          <div style={{display:"flex",gap:4,padding:"0 20px 10px",flexWrap:"wrap"}}>
             {NAV.map(n=>(
               <button key={n.id} onClick={()=>setPage(n.id)}
-                style={{padding:"7px 13px",borderRadius:10,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,transition:"all 0.15s",fontFamily:"inherit",
+                style={{padding:"6px 12px",borderRadius:10,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,transition:"all 0.15s",fontFamily:"inherit",
                   borderColor:page===n.id?"rgba(10,132,255,0.4)":theme.border,
                   background:page===n.id?"rgba(10,132,255,0.12)":theme.toggleBg,
                   color:page===n.id?"#0A84FF":theme.textMuted,
@@ -982,10 +992,6 @@ export default function App() {
                 {n.id==="stock"&&alertes>0&&<span style={{background:"#FF453A",color:"#fff",borderRadius:99,padding:"1px 5px",fontSize:10,fontWeight:800}}>{alertes}</span>}
               </button>
             ))}
-          </nav>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{fontSize:11,color:theme.textMuted}}>{new Date().toLocaleDateString("fr-SN",{weekday:"short",day:"numeric",month:"long"})}</div>
-            <ThemeToggle/>
           </div>
         </header>
 
