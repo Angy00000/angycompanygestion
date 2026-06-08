@@ -531,7 +531,7 @@ function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast}) {
 }
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
-function Stock({stock,setStock,ventes,setVentes,factures,setFactures,catStk,showToast,setPage}) {
+function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,setDepenses,catStk,showToast,setPage}) {
   const {theme}=useTheme();
   const [showAdd,setShowAdd]=useState(false);
   const [showVente,setShowVente]=useState(null);
@@ -541,6 +541,8 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,catStk,show
   const [loading,setLoading]=useState(false);
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
+
+  const [ajouterDepense,setAjouterDepense]=useState(false);
 
   const filtered=stock.filter(p=>fCat==="all"||p.cat===fCat);
 
@@ -557,9 +559,20 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,catStk,show
     try{
       const rows=await dbAdd("stock",{nom:form.nom,cat:form.cat,qte:parseInt(form.qte),prix_achat:parseInt(form.prix_achat),prix_vente:parseInt(form.prix_vente),seuil:parseInt(form.seuil)||0});
       setStock([rows[0],...stock]);
+
+      // Créer dépense automatiquement si demandé
+      if(ajouterDepense && form.prix_achat){
+        const montantTotal=parseInt(form.prix_achat)*parseInt(form.qte);
+        const depRows=await dbAdd("depenses",{titre:form.nom,cat:form.cat,montant:montantTotal,date:today(),statut:"En attente",note:`Achat stock x${form.qte}`});
+        setDepenses([depRows[0],...depenses]);
+        showToast("Produit + Dépense enregistrés ✓");
+      } else {
+        showToast("Produit ajouté ✓");
+      }
+
       setForm({nom:"",cat:catStk[0]?.id||"iphones",qte:"",prix_achat:"",prix_vente:"",seuil:""});
+      setAjouterDepense(false);
       setShowAdd(false);
-      showToast("Produit ajouté ✓");
     }catch(e){showToast("Erreur",true);}
     setLoading(false);
   };
@@ -612,6 +625,29 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,catStk,show
             <Inp label="Prix vente (FCFA) *" type="number" value={form.prix_vente} onChange={e=>setForm({...form,prix_vente:e.target.value})} placeholder="0"/>
             <Inp label="Seuil alerte" type="number" value={form.seuil} onChange={e=>setForm({...form,seuil:e.target.value})} placeholder="3"/>
           </div>
+
+          {/* Option enregistrer comme dépense */}
+          {form.prix_achat&&form.qte&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:10,
+              background:ajouterDepense?"rgba(255,69,58,0.08)":"rgba(255,255,255,0.04)",
+              border:`1px solid ${ajouterDepense?"rgba(255,69,58,0.3)":theme.border}`,
+              marginBottom:14,cursor:"pointer"}}
+              onClick={()=>setAjouterDepense(!ajouterDepense)}>
+              <div style={{width:20,height:20,borderRadius:6,
+                background:ajouterDepense?"#FF453A":theme.toggleBg,
+                border:`2px solid ${ajouterDepense?"#FF453A":theme.border}`,
+                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {ajouterDepense&&<span style={{color:"#fff",fontSize:13,fontWeight:900}}>✓</span>}
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:theme.text}}>📤 Enregistrer comme dépense</div>
+                <div style={{fontSize:11,color:theme.textMuted}}>
+                  Montant total : <strong style={{color:"#FF453A"}}>{xof(parseInt(form.prix_achat||0)*parseInt(form.qte||0))}</strong> sera ajouté aux dépenses
+                </div>
+              </div>
+            </div>
+          )}
+
           <BtnPri onClick={addProd} style={{opacity:loading?0.6:1}}>{loading?"Ajout...":"Ajouter au stock"}</BtnPri>
         </Card>
       )}
@@ -1099,7 +1135,15 @@ function Benefices({depenses,ventes,stock}) {
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [dark,setDark]=useState(true);
+  const [dark,setDark]=useState(()=>window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+  // Suit automatiquement le mode du téléphone/iPad
+  useEffect(()=>{
+    const mq=window.matchMedia("(prefers-color-scheme: dark)");
+    const handler=(e)=>setDark(e.matches);
+    mq.addEventListener("change",handler);
+    return ()=>mq.removeEventListener("change",handler);
+  },[]);
   const theme=dark?DARK:LIGHT;
   const [page,setPage]=useState("dashboard");
   const [depenses,setDepenses]=useState([]);
@@ -1166,7 +1210,7 @@ export default function App() {
             <>
               {page==="dashboard"  &&<Dashboard   depenses={depenses} stock={stock} ventes={ventes} factures={factures}/>}
               {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} stock={stock} setStock={setStock} showToast={showToast}/>}
-              {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} catStk={catStk} showToast={showToast} setPage={setPage}/>}
+              {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} depenses={depenses} setDepenses={setDepenses} catStk={catStk} showToast={showToast} setPage={setPage}/>}
               {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
