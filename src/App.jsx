@@ -594,8 +594,7 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
         const lignes=JSON.stringify([{desc:p.nom,cat:p.cat,qte:q,pu:p.prix_vente,details:{}}]);
         const factRows=await dbAdd("factures",{numero,client:vf.client||"—",email:"",telephone:vf.telephone||"",adresse:"",date:vf.date,note:"Merci pour votre confiance",lignes,total:q*p.prix_vente});
         setFactures([factRows[0],...factures]);
-        showToast("Vente + Facture créées ✓");
-        setPage("factures");
+        showToast("Vente + Facture créées ✓ — Allez dans 🧾 Factures");
       } else {
         showToast("Vente enregistrée ✓");
       }
@@ -812,8 +811,11 @@ function Factures({factures,setFactures,stock,showToast}) {
 
   const imprimer=()=>{
     const content=printRef.current.innerHTML;
-    const w=window.open("","_blank");
-    w.document.write(`<html><head><title>Facture Angy Company</title><style>
+    // Créer un iframe invisible pour imprimer sans quitter la page
+    const iframe=document.createElement("iframe");
+    iframe.style.display="none";
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(`<html><head><title>Facture Angy Company</title><style>
       *{box-sizing:border-box;}
       body{font-family:Arial,sans-serif;margin:0;padding:40px;color:#1C1C1E;}
       table{width:100%;border-collapse:collapse;}
@@ -821,8 +823,10 @@ function Factures({factures,setFactures,stock,showToast}) {
       td{padding:10px;border-bottom:1px solid #e5e5ea;font-size:13px;}
       .details{font-size:11px;color:#636366;margin-top:3px;}
     </style></head><body>${content}</body></html>`);
-    w.document.close();
-    w.print();
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(()=>document.body.removeChild(iframe),1000);
   };
 
   const del=async(id)=>{await dbDel("factures",id);setFactures(factures.filter(f=>f.id!==id));if(preview?.id===id)setPreview(null);showToast("Supprimée");};
@@ -1167,7 +1171,6 @@ function AngyLogin({onLogin}) {
     if(user){
       saveAngySession(user);
       onLogin(user);
-      window.location.reload(); // Force reload pour éviter page blanche
     }
     else setErreur("Email ou mot de passe incorrect");
   };
@@ -1298,7 +1301,7 @@ export default function App() {
               </div>
               <button onClick={()=>setChangeMdp(true)} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"5px 10px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🔑</button>
               <ThemeToggle/>
-              <button onClick={()=>{clearAngySession();window.location.reload();}} style={{background:"rgba(255,69,58,0.12)",border:"1px solid #FF453A",color:"#FF453A",padding:"5px 12px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>🚪</button>
+              <button onClick={()=>{clearAngySession();setUser(null);}} style={{background:"rgba(255,69,58,0.12)",border:"1px solid #FF453A",color:"#FF453A",padding:"5px 12px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>🚪</button>
             </div>
           </div>
           {/* Ligne 2 : Navigation */}
