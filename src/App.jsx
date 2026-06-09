@@ -4,10 +4,78 @@ import { useState, createContext, useContext, useEffect, useRef } from "react";
 const SUPA_URL = "https://nfpnhyvuwpzezwbmxtgd.supabase.co";
 const SUPA_KEY = "sb_publishable_P8-5bnMCTeclywsL6zsmiA_tJADw-m1";
 
-const dbGet    = (t) => fetch(`${SUPA_URL}/rest/v1/${t}?order=id.desc`,{headers:{"apikey":SUPA_KEY,"Authorization":`Bearer ${SUPA_KEY}`}}).then(r=>r.json());
-const dbAdd    = (t,d) => fetch(`${SUPA_URL}/rest/v1/${t}`,{method:"POST",headers:{"apikey":SUPA_KEY,"Authorization":`Bearer ${SUPA_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"},body:JSON.stringify(d)}).then(r=>r.json());
-const dbDel    = (t,id) => fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:{"apikey":SUPA_KEY,"Authorization":`Bearer ${SUPA_KEY}`}});
-const dbPatch  = (t,id,d) => fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:{"apikey":SUPA_KEY,"Authorization":`Bearer ${SUPA_KEY}`,"Content-Type":"application/json"},body:JSON.stringify(d)});
+const dbHeaders = {
+  "apikey": SUPA_KEY,
+  "Authorization": `Bearer ${SUPA_KEY}`,
+  "Content-Type": "application/json",
+  "Prefer": "return=representation",
+};
+
+// ─── Cache & File d'attente offline ──────────────────────────────────────────
+const ANGY_CACHE_KEY = "angy_cache";
+const ANGY_QUEUE_KEY = "angy_queue";
+const loadAngyCache = () => { try { return JSON.parse(localStorage.getItem(ANGY_CACHE_KEY)||"null"); } catch { return null; } };
+const saveAngyCache = (d) => localStorage.setItem(ANGY_CACHE_KEY, JSON.stringify(d));
+const loadAngyQueue = () => { try { return JSON.parse(localStorage.getItem(ANGY_QUEUE_KEY)||"[]"); } catch { return []; } };
+const saveAngyQueue = (q) => localStorage.setItem(ANGY_QUEUE_KEY, JSON.stringify(q));
+
+const addToAngyQueue = (action) => {
+  const q = loadAngyQueue();
+  q.push({...action, id: Date.now(), timestamp: new Date().toISOString()});
+  saveAngyQueue(q);
+};
+
+const isOnline = () => navigator.onLine;
+
+const syncAngyQueue = async () => {
+  const q = loadAngyQueue();
+  if(q.length === 0) return;
+  const remaining = [];
+  for(const action of q){
+    try{
+      if(action.type === "ADD"){
+        await fetch(`${SUPA_URL}/rest/v1/${action.table}`,{method:"POST",headers:dbHeaders,body:JSON.stringify(action.data)});
+      } else if(action.type === "DEL"){
+        await fetch(`${SUPA_URL}/rest/v1/${action.table}?id=eq.${action.id}`,{method:"DELETE",headers:dbHeaders});
+      } else if(action.type === "PATCH"){
+        await fetch(`${SUPA_URL}/rest/v1/${action.table}?id=eq.${action.id}`,{method:"PATCH",headers:dbHeaders,body:JSON.stringify(action.data)});
+      }
+    } catch(e){ remaining.push(action); }
+  }
+  saveAngyQueue(remaining);
+};
+
+// ─── Fonctions DB avec fallback offline ───────────────────────────────────────
+const dbGet = (t) => fetch(`${SUPA_URL}/rest/v1/${t}?order=id.desc`,{headers:dbHeaders}).then(r=>r.json());
+
+const dbAdd = async (t, d) => {
+  if(isOnline()){
+    try{
+      const r = await fetch(`${SUPA_URL}/rest/v1/${t}`,{method:"POST",headers:dbHeaders,body:JSON.stringify(d)});
+      return r.json();
+    }catch(e){
+      addToAngyQueue({type:"ADD",table:t,data:d});
+      return [{...d, id: Date.now()}];
+    }
+  } else {
+    addToAngyQueue({type:"ADD",table:t,data:d});
+    return [{...d, id: Date.now()}];
+  }
+};
+
+const dbDel = async (t, id) => {
+  if(isOnline()){
+    try{ return fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:dbHeaders}); }
+    catch(e){ addToAngyQueue({type:"DEL",table:t,id}); }
+  } else { addToAngyQueue({type:"DEL",table:t,id}); }
+};
+
+const dbPatch = async (t, id, d) => {
+  if(isOnline()){
+    try{ return fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:dbHeaders,body:JSON.stringify(d)}); }
+    catch(e){ addToAngyQueue({type:"PATCH",table:t,id,data:d}); }
+  } else { addToAngyQueue({type:"PATCH",table:t,id,data:d}); }
+};
 
 // ─── Thème ────────────────────────────────────────────────────────────────────
 const ThemeCtx = createContext();
@@ -1674,6 +1742,7 @@ export default function App() {
   const [catStk,setCatStk]=useState(DEFAULT_CAT_STK);
   const [loading,setLoading]=useState(true);
   const [toast,setToast]=useState(null);
+  const [offline,setOffline]=useState(false);
 
   const showToast=(msg,err=false)=>{setToast({msg,err});setTimeout(()=>setToast(null),3000);};
 
@@ -1691,11 +1760,54 @@ export default function App() {
   useEffect(()=>{
     (async()=>{
       try{
-        const [d,s,v,f]=await Promise.all([dbGet("depenses"),dbGet("stock"),dbGet("ventes"),dbGet("factures").catch(()=>[])]);
-        setDepenses(d||[]);setStock(s||[]);setVentes(v||[]);setFactures(f||[]);
-      }catch(e){showToast("Erreur de connexion",true);}
+        const [d,s,v,f]=await Promise.all([
+          dbGet("depenses"),dbGet("stock"),
+          dbGet("ventes"),dbGet("factures").catch(()=>[])
+        ]);
+        const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[]};
+        setDepenses(data.depenses);setStock(data.stock);
+        setVentes(data.ventes);setFactures(data.factures);
+        saveAngyCache(data);
+        setOffline(false);
+      }catch(e){
+        // Pas de connexion → charger depuis le cache
+        const cache=loadAngyCache();
+        if(cache){
+          setDepenses(cache.depenses||[]);
+          setStock(cache.stock||[]);
+          setVentes(cache.ventes||[]);
+          setFactures(cache.factures||[]);
+        }
+        setOffline(true);
+      }
       setLoading(false);
     })();
+  },[]);
+
+  // Sync au retour de connexion
+  useEffect(()=>{
+    const handleOnline=async()=>{
+      await syncAngyQueue();
+      setOffline(false);
+      try{
+        const [d,s,v,f]=await Promise.all([
+          dbGet("depenses"),dbGet("stock"),
+          dbGet("ventes"),dbGet("factures").catch(()=>[])
+        ]);
+        const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[]};
+        setDepenses(data.depenses);setStock(data.stock);
+        setVentes(data.ventes);setFactures(data.factures);
+        saveAngyCache(data);
+        showToast("Synchronisation terminée ✓");
+      }catch(e){}
+    };
+    const handleOffline=()=>setOffline(true);
+    window.addEventListener("online",handleOnline);
+    window.addEventListener("offline",handleOffline);
+    return ()=>{
+      window.removeEventListener("online",handleOnline);
+      window.removeEventListener("offline",handleOffline);
+    };
   },[]);
 
   const alertes=stock.filter(p=>p.qte<=p.seuil).length;
@@ -1715,6 +1827,17 @@ export default function App() {
     <ThemeCtx.Provider value={{dark,toggle:()=>setDark(d=>!d),theme}}>
       <div style={{minHeight:"100vh",background:theme.bg,color:theme.text,fontFamily:"'SF Pro Display','Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column",transition:"background 0.25s,color 0.25s"}}>
         <header style={{background:theme.bgHeader,backdropFilter:"blur(20px)",borderBottom:`1px solid ${theme.border}`,position:"sticky",top:0,zIndex:100,boxShadow:theme.shadow,transition:"background 0.25s"}}>
+          {/* Bandeau hors ligne */}
+          {offline&&(
+            <div style={{background:"#3A2F1C",borderBottom:"1px solid #FF9F0A",padding:"6px 20px",display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:13}}>📵</span>
+              <span style={{fontSize:12,color:"#FF9F0A",fontWeight:600}}>
+                Mode hors ligne — vous pouvez continuer à travailler.
+                {loadAngyQueue().length>0&&` ${loadAngyQueue().length} action(s) en attente.`}
+                {" "}Synchronisation automatique dès reconnexion.
+              </span>
+            </div>
+          )}
           {/* Ligne 1 : Logo + User + Toggle */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px"}}>
             <AngyLogo height={52}/>
