@@ -1133,9 +1133,99 @@ function Benefices({depenses,ventes,stock}) {
   );
 }
 
+// ─── Session ──────────────────────────────────────────────────────────────────
+const ANGY_SESSION = "angy_session";
+const loadAngySession = () => { try { return JSON.parse(localStorage.getItem(ANGY_SESSION)||"null"); } catch { return null; } };
+const saveAngySession = (u) => localStorage.setItem(ANGY_SESSION, JSON.stringify(u));
+const clearAngySession = () => localStorage.removeItem(ANGY_SESSION);
+
+// Utilisateurs Angy par défaut (stockés localement)
+const ANGY_USERS_KEY = "angy_users";
+const loadAngyUsers = () => {
+  try {
+    const u=JSON.parse(localStorage.getItem(ANGY_USERS_KEY)||"null");
+    if(u)return u;
+    // Compte admin par défaut
+    const def=[{id:1,nom:"ANGY",prenom:"Admin",email:"admin@angy.com",mot_de_passe:"angy2024",role:"admin",actif:true}];
+    localStorage.setItem(ANGY_USERS_KEY,JSON.stringify(def));
+    return def;
+  } catch { return []; }
+};
+const saveAngyUsers = (u) => localStorage.setItem(ANGY_USERS_KEY, JSON.stringify(u));
+
+// ─── Login Screen ─────────────────────────────────────────────────────────────
+function AngyLogin({onLogin}) {
+  const [dark]=useState(()=>window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const theme=dark?DARK:LIGHT;
+  const [email,setEmail]=useState("");
+  const [mdp,setMdp]=useState("");
+  const [erreur,setErreur]=useState("");
+
+  const login=()=>{
+    const users=loadAngyUsers();
+    const user=users.find(u=>u.email===email&&u.mot_de_passe===mdp&&u.actif);
+    if(user){saveAngySession(user);onLogin(user);}
+    else setErreur("Email ou mot de passe incorrect");
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:dark?"#000":"#F2F2F7",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'SF Pro Display','Segoe UI',sans-serif",padding:20}}>
+      <div style={{width:"100%",maxWidth:400}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <AngyLogoStatic height={60}/>
+          <div style={{fontSize:14,color:dark?"#636366":"#8E8E93",marginTop:12}}>Connectez-vous pour accéder au système</div>
+        </div>
+        <div style={{background:dark?"#1C1C1E":"#FFFFFF",borderRadius:20,padding:28,border:`1px solid ${dark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.08)"}`,boxShadow:"0 4px 24px rgba(0,0,0,0.1)"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:20}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:13,fontWeight:600,color:dark?"#8E8E93":"#636366"}}>Email</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="admin@angy.com"
+                style={{background:dark?"rgba(255,255,255,0.07)":"#F2F2F7",border:`1px solid ${dark?"rgba(255,255,255,0.12)":"rgba(0,0,0,0.12)"}`,borderRadius:10,padding:"12px 14px",color:dark?"#F2F2F7":"#1C1C1E",fontSize:15,outline:"none",fontFamily:"inherit"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:13,fontWeight:600,color:dark?"#8E8E93":"#636366"}}>Mot de passe</label>
+              <input type="password" value={mdp} onChange={e=>setMdp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="••••••••"
+                style={{background:dark?"rgba(255,255,255,0.07)":"#F2F2F7",border:`1px solid ${dark?"rgba(255,255,255,0.12)":"rgba(0,0,0,0.12)"}`,borderRadius:10,padding:"12px 14px",color:dark?"#F2F2F7":"#1C1C1E",fontSize:15,outline:"none",fontFamily:"inherit"}}/>
+            </div>
+          </div>
+          {erreur&&<div style={{background:"#3A1C1C",color:"#FF453A",padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:600,marginBottom:14}}>❌ {erreur}</div>}
+          <button onClick={login} style={{width:"100%",background:"#0A84FF",color:"#fff",border:"none",padding:"14px",borderRadius:12,fontWeight:700,cursor:"pointer",fontSize:16,fontFamily:"inherit"}}>
+            Se connecter
+          </button>
+          <div style={{textAlign:"center",marginTop:14,fontSize:12,color:dark?"#3A3A3C":"#AEAEB2"}}>
+            Par défaut : admin@angy.com / angy2024
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Logo statique pour le login (sans context)
+const AngyLogoStatic = ({height=60}) => (
+  <svg height={height} viewBox="0 0 420 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="10" y="20" width="12" height="65" fill="#1400FF"/>
+    <rect x="10" y="73" width="60" height="12" fill="#1400FF"/>
+    {[["A",50],["N",90],["G",130],["Y",170]].map(([l,cx])=>(
+      <g key={l}>
+        <circle cx={cx} cy="50" r="22" fill="white" stroke="#1C1C1E" strokeWidth="3"/>
+        <text x={cx} y="57" textAnchor="middle" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="20" fill="#1C1C1E">{l}</text>
+      </g>
+    ))}
+    <text x="207" y="60" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="32" fill="#1C1C1E">Company</text>
+    <rect x="408" y="20" width="12" height="38" fill="#CC0000"/>
+    <rect x="350" y="20" width="70" height="12" fill="#CC0000"/>
+  </svg>
+);
+
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [dark,setDark]=useState(()=>window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const [user,setUser]=useState(()=>loadAngySession());
+  const [changeMdp,setChangeMdp]=useState(false);
+  const [ancienMdp,setAncienMdp]=useState("");
+  const [nouveauMdp,setNouveauMdp]=useState("");
+  const [confirmMdp,setConfirmMdp]=useState("");
 
   // Suit automatiquement le mode du téléphone/iPad
   useEffect(()=>{
@@ -1144,6 +1234,7 @@ export default function App() {
     mq.addEventListener("change",handler);
     return ()=>mq.removeEventListener("change",handler);
   },[]);
+
   const theme=dark?DARK:LIGHT;
   const [page,setPage]=useState("dashboard");
   const [depenses,setDepenses]=useState([]);
@@ -1157,6 +1248,17 @@ export default function App() {
 
   const showToast=(msg,err=false)=>{setToast({msg,err});setTimeout(()=>setToast(null),3000);};
 
+  // Afficher login si pas de session
+  if(!user) return (
+    <ThemeCtx.Provider value={{dark,toggle:()=>setDark(d=>!d),theme}}>
+      <AngyLogin onLogin={(u)=>setUser(u)}/>
+    </ThemeCtx.Provider>
+  );
+
+  const isAdmin=user?.role==="admin";
+  const isVendeur=user?.role==="vendeur";
+  const isComptable=user?.role==="comptable";;
+
   useEffect(()=>{
     (async()=>{
       try{
@@ -1167,26 +1269,32 @@ export default function App() {
     })();
   },[]);
 
-  const NAV=[
-    {id:"dashboard",label:"Dashboard",icon:"◈"},
-    {id:"depenses", label:"Dépenses",  icon:"📤"},
-    {id:"stock",    label:"Stock",     icon:"📦"},
-    {id:"factures", label:"Factures",  icon:"🧾"},
-    {id:"benefices",label:"Bénéfices", icon:"📈"},
-    {id:"categories",label:"Catégories",icon:"🏷️"},
-  ];
   const alertes=stock.filter(p=>p.qte<=p.seuil).length;
+
+  const NAV=[
+    {id:"dashboard",  label:"Dashboard",   icon:"◈"},
+    ...(isAdmin||isComptable?[{id:"depenses",label:"Dépenses",icon:"📤"}]:[]),
+    ...(isAdmin||isVendeur?[{id:"stock",label:"Stock",icon:"📦",badge:alertes}]:[]),
+    ...(isAdmin||isVendeur||isComptable?[{id:"factures",label:"Factures",icon:"🧾"}]:[]),
+    ...(isAdmin||isComptable?[{id:"benefices",label:"Bénéfices",icon:"📈"}]:[]),
+    ...(isAdmin?[{id:"categories",label:"Catégories",icon:"🏷️"}]:[]),
+  ];
 
   return (
     <ThemeCtx.Provider value={{dark,toggle:()=>setDark(d=>!d),theme}}>
       <div style={{minHeight:"100vh",background:theme.bg,color:theme.text,fontFamily:"'SF Pro Display','Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column",transition:"background 0.25s,color 0.25s"}}>
         <header style={{background:theme.bgHeader,backdropFilter:"blur(20px)",borderBottom:`1px solid ${theme.border}`,position:"sticky",top:0,zIndex:100,boxShadow:theme.shadow,transition:"background 0.25s"}}>
-          {/* Ligne 1 : Logo + Toggle */}
+          {/* Ligne 1 : Logo + User + Toggle */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px"}}>
             <AngyLogo height={52}/>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{fontSize:11,color:theme.textMuted}}>📍 Parcelles Assainies U18, Dakar</div>
+              <div style={{fontSize:11,color:"#0A84FF",fontWeight:700,background:"rgba(10,132,255,0.12)",padding:"4px 10px",borderRadius:99}}>
+                {user?.role==="admin"?"👑":user?.role==="vendeur"?"🛒":"💰"} {user?.prenom} {user?.nom}
+              </div>
+              <button onClick={()=>setChangeMdp(true)} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"5px 10px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🔑</button>
               <ThemeToggle/>
+              <button onClick={()=>{clearAngySession();setUser(null);}} style={{background:"rgba(255,69,58,0.12)",border:"1px solid #FF453A",color:"#FF453A",padding:"5px 12px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>🚪</button>
             </div>
           </div>
           {/* Ligne 2 : Navigation */}
@@ -1222,6 +1330,53 @@ export default function App() {
           Angy Company · Système de gestion interne · Dakar 🇸🇳
         </footer>
         {toast&&<Toast msg={toast.msg} err={toast.err}/>}
+
+        {/* Modal changement mot de passe */}
+        {changeMdp&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+            <div style={{background:theme.bgCard,borderRadius:20,padding:28,width:"100%",maxWidth:400,border:`1px solid ${theme.border}`}}>
+              <div style={{fontSize:16,fontWeight:800,color:theme.text,marginBottom:20}}>🔑 Changer mon mot de passe</div>
+              <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Ancien mot de passe</label>
+                  <input type="password" value={ancienMdp} onChange={e=>setAncienMdp(e.target.value)} placeholder="••••••••"
+                    style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"10px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Nouveau mot de passe</label>
+                  <input type="password" value={nouveauMdp} onChange={e=>setNouveauMdp(e.target.value)} placeholder="••••••••"
+                    style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"10px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Confirmer</label>
+                  <input type="password" value={confirmMdp} onChange={e=>setConfirmMdp(e.target.value)} placeholder="••••••••"
+                    style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"10px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>{
+                  if(!ancienMdp||!nouveauMdp||!confirmMdp)return showToast("Tous les champs requis",true);
+                  if(ancienMdp!==user.mot_de_passe)return showToast("Ancien mot de passe incorrect",true);
+                  if(nouveauMdp!==confirmMdp)return showToast("Les mots de passe ne correspondent pas",true);
+                  if(nouveauMdp.length<6)return showToast("Minimum 6 caractères",true);
+                  const users=loadAngyUsers();
+                  const updated=users.map(u=>u.id===user.id?{...u,mot_de_passe:nouveauMdp}:u);
+                  saveAngyUsers(updated);
+                  const newUser={...user,mot_de_passe:nouveauMdp};
+                  setUser(newUser);saveAngySession(newUser);
+                  setAncienMdp("");setNouveauMdp("");setConfirmMdp("");
+                  setChangeMdp(false);showToast("Mot de passe changé ✓");
+                }} style={{flex:1,background:"#0A84FF",color:"#fff",border:"none",padding:"11px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+                  Confirmer
+                </button>
+                <button onClick={()=>{setChangeMdp(false);setAncienMdp("");setNouveauMdp("");setConfirmMdp("");}}
+                  style={{background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,padding:"11px 18px",borderRadius:10,fontWeight:600,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ThemeCtx.Provider>
   );
