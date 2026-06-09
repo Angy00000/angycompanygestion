@@ -547,9 +547,10 @@ function Categories({catDep,setCatDep,catStk,setCatStk,showToast}) {
 const CATS_STOCK = ["iphones","accessoires","ordinateurs","pieces"];
 
 // ─── Dépenses ─────────────────────────────────────────────────────────────────
-function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast}) {
+function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast,rechercheFiltre=""}) {
   const {theme}=useTheme();
   const [fCat,setFCat]=useState("all");
+  const [search,setSearch]=useState(rechercheFiltre||"");
   const [fStat,setFStat]=useState("all");
   const [show,setShow]=useState(false);
   const [loading,setLoading]=useState(false);
@@ -711,13 +712,14 @@ function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast}) {
 }
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
-function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,setDepenses,catStk,showToast,setPage}) {
+function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,setDepenses,catStk,showToast,setPage,rechercheFiltre=""}) {
   const {theme}=useTheme();
   const [showAdd,setShowAdd]=useState(false);
   const [showVente,setShowVente]=useState(null);
   const [form,setForm]=useState({nom:"",cat:catStk[0]?.id||"iphones",qte:"",prix_achat:"",prix_vente:"",seuil:""});
   const [vf,setVf]=useState({qte:"",client:"",telephone:"",date:today(),creerFacture:true,paiement:"Espèces"});
   const [fCat,setFCat]=useState("all");
+  const [search,setSearch]=useState(rechercheFiltre||"");
   const [loading,setLoading]=useState(false);
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
@@ -970,14 +972,15 @@ const CATS_FACTURE = [
 ];
 
 // ─── Factures ─────────────────────────────────────────────────────────────────
-function Factures({factures,setFactures,stock,showToast}) {
+function Factures({factures,setFactures,stock,showToast,clients,rechercheFiltre=""}) {
   const {theme}=useTheme();
   const [show,setShow]=useState(false);
   const [preview,setPreview]=useState(null);
   const printRef=useRef();
   const [loading,setLoading]=useState(false);
   const [lignes,setLignes]=useState([{desc:"",cat:"iphones",qte:1,pu:0,details:{}}]);
-  const [form,setForm]=useState({client:"",email:"",telephone:"",adresse:"",date:today(),note:""});
+  const [form,setForm]=useState({client:"",email:"",telephone:"",adresse:"",date:today(),note:"",paiement:"Espèces"});
+  const [search,setSearch]=useState(rechercheFiltre||"");
 
   const totalLignes=lignes.reduce((s,l)=>s+l.qte*l.pu,0);
   const numFacture=()=>`FAC-${new Date().getFullYear()}-${String(factures.length+1).padStart(3,"0")}`;
@@ -1272,12 +1275,15 @@ function Factures({factures,setFactures,stock,showToast}) {
       })()}
 
       {/* Liste factures */}
+      {search&&<div style={{background:"rgba(10,132,255,0.1)",border:"1px solid rgba(10,132,255,0.3)",borderRadius:10,padding:"8px 14px",marginBottom:12,fontSize:13,color:"#0A84FF",fontWeight:600}}>
+        🔍 Résultats pour "{search}" <button onClick={()=>setSearch("")} style={{background:"none",border:"none",color:"#0A84FF",cursor:"pointer",fontSize:13,marginLeft:8}}>✕ Effacer</button>
+      </div>}
       <TableWrap>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>{["Numéro","Client","Date","Paiement","Total","Actions"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
           <tbody>
-            {factures.length===0&&<tr><Td colSpan={6} style={{textAlign:"center",color:theme.textMuted,padding:"2rem"}}>Aucune facture</Td></tr>}
-            {factures.map(f=>{
+            {factures.filter(f=>!search||(f.client?.toLowerCase().includes(search.toLowerCase())||f.numero?.toLowerCase().includes(search.toLowerCase()))).length===0&&<tr><Td colSpan={6} style={{textAlign:"center",color:theme.textMuted,padding:"2rem"}}>Aucune facture</Td></tr>}
+            {factures.filter(f=>!search||(f.client?.toLowerCase().includes(search.toLowerCase())||f.numero?.toLowerCase().includes(search.toLowerCase()))).map(f=>{
               const pColor=f.paiement==="Wave"?"#00B9F1":f.paiement==="Orange Money"?"#FF6600":f.paiement==="Free Money"?"#0066FF":f.paiement==="Virement"?"#BF5AF2":f.paiement==="Crédit"?"#FF453A":"#30D158";
               return (
               <tr key={f.id}>
@@ -1574,11 +1580,11 @@ function Ventes({ventes,setVentes,factures,catStk,showToast}) {
 }
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
-function Clients({clients,setClients,factures,showToast}) {
+function Clients({clients,setClients,factures,showToast,rechercheFiltre=""}) {
   const {theme}=useTheme();
   const [show,setShow]=useState(false);
   const [editId,setEditId]=useState(null);
-  const [search,setSearch]=useState("");
+  const [search,setSearch]=useState(rechercheFiltre||"");
   const [selected,setSelected]=useState(null);
   const [form,setForm]=useState({nom:"",telephone:"",email:"",adresse:"",type:"Particulier",note:""});
 
@@ -2181,6 +2187,7 @@ export default function App() {
   const [confirmMdp,setConfirmMdp]=useState("");
   const [recherche,setRecherche]=useState("");
   const [showRecherche,setShowRecherche]=useState(false);
+  const [rechercheFiltre,setRechercheFiltre]=useState("");
 
   // Suit automatiquement le mode du téléphone/iPad
   useEffect(()=>{
@@ -2325,7 +2332,7 @@ export default function App() {
                 return (
                   <div style={{position:"absolute",top:"100%",left:0,right:0,background:theme.bgCard,border:`1px solid ${theme.border}`,borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.3)",zIndex:999,marginTop:4,overflow:"hidden"}}>
                     {results.map((r,i)=>(
-                      <div key={i} onClick={()=>{setPage(r.page);setRecherche("");setShowRecherche(false);}}
+                      <div key={i} onClick={()=>{setPage(r.page);setRechercheFiltre(recherche);setRecherche("");setShowRecherche(false);}}
                         style={{padding:"10px 16px",cursor:"pointer",borderBottom:`1px solid ${theme.borderLight}`,display:"flex",gap:10,alignItems:"center",transition:"background 0.1s"}}>
                         <span style={{fontSize:16}}>{r.type}</span>
                         <div>
@@ -2351,7 +2358,7 @@ export default function App() {
           {/* Ligne 2 : Navigation */}
           <div style={{display:"flex",gap:4,padding:"0 20px 10px",flexWrap:"wrap"}}>
             {NAV.map(n=>(
-              <button key={n.id} onClick={()=>setPage(n.id)}
+              <button key={n.id} onClick={()=>{setPage(n.id);setRechercheFiltre("");}}
                 style={{padding:"6px 12px",borderRadius:10,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,transition:"all 0.15s",fontFamily:"inherit",
                   borderColor:page===n.id?"rgba(10,132,255,0.4)":theme.border,
                   background:page===n.id?"rgba(10,132,255,0.12)":theme.toggleBg,
@@ -2368,11 +2375,11 @@ export default function App() {
           {loading?<div style={{textAlign:"center",padding:"60px",fontSize:32}}>⏳</div>:(
             <>
               {page==="dashboard"  &&<Dashboard   depenses={depenses} stock={stock} ventes={ventes} factures={factures}/>}
-              {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} stock={stock} setStock={setStock} showToast={showToast}/>}
-              {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} depenses={depenses} setDepenses={setDepenses} catStk={catStk} showToast={showToast} setPage={setPage}/>}
+              {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} stock={stock} setStock={setStock} showToast={showToast} rechercheFiltre={rechercheFiltre}/>}
+              {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} depenses={depenses} setDepenses={setDepenses} catStk={catStk} showToast={showToast} setPage={setPage} rechercheFiltre={rechercheFiltre}/>}
               {page==="ventes"     &&<Ventes      ventes={ventes} setVentes={setVentes} factures={factures} catStk={catStk} showToast={showToast}/>}
-              {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} clients={clients}/>}
-              {page==="clients"    &&<Clients     clients={clients} setClients={setClients} factures={factures} showToast={showToast}/>}
+              {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} clients={clients} rechercheFiltre={rechercheFiltre}/>}
+              {page==="clients"    &&<Clients     clients={clients} setClients={setClients} factures={factures} showToast={showToast} rechercheFiltre={rechercheFiltre}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock} factures={factures}/>}
               {page==="rapports"   &&<Rapports    depenses={depenses} stock={stock} ventes={ventes} factures={factures} catStk={catStk}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
