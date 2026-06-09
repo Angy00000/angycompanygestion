@@ -1489,6 +1489,181 @@ function Ventes({ventes,setVentes,factures,catStk,showToast}) {
   );
 }
 
+// ─── Rapports ─────────────────────────────────────────────────────────────────
+function Rapports({depenses,stock,ventes,factures,catStk}) {
+  const {theme}=useTheme();
+  const now=new Date();
+  const annee=now.getFullYear();
+  const MOIS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+
+  // Calculs globaux
+  const totalCA=factures.reduce((s,f)=>s+f.total,0);
+  const totalDep=depenses.filter(d=>d.statut==="Approuvée").reduce((s,d)=>s+d.montant,0);
+  const benefice=totalCA-totalDep;
+  const marge=totalCA>0?Math.round((benefice/totalCA)*100):0;
+  const stockVal=stock.reduce((s,p)=>s+p.prix_achat*p.qte,0);
+
+  // Par mois
+  const parMois=MOIS.map((_,i)=>{
+    const mm=String(i+1).padStart(2,"0");
+    const ca=factures.filter(f=>f.date?.slice(5,7)===mm&&f.date?.startsWith(String(annee))).reduce((s,f)=>s+f.total,0);
+    const dep=depenses.filter(d=>d.statut==="Approuvée"&&d.date?.slice(5,7)===mm&&d.date?.startsWith(String(annee))).reduce((s,d)=>s+d.montant,0);
+    return {mois:MOIS[i],ca,dep,ben:ca-dep};
+  });
+
+  // Top produits
+  const byProd={};
+  factures.forEach(f=>{
+    try{
+      const lignes=typeof f.lignes==="string"?JSON.parse(f.lignes):f.lignes||[];
+      lignes.forEach(l=>{
+        if(!l.desc)return;
+        if(!byProd[l.desc])byProd[l.desc]={produit:l.desc,qte:0,ca:0,cat:l.cat||""};
+        byProd[l.desc].qte+=l.qte||1;
+        byProd[l.desc].ca+=(l.qte||1)*(l.pu||0);
+      });
+    }catch(e){}
+  });
+  const topProduits=Object.values(byProd).sort((a,b)=>b.ca-a.ca);
+
+  // Imprimer un rapport
+  const imprimer=(type)=>{
+    const iframe=document.createElement("iframe");
+    iframe.style.display="none";
+    document.body.appendChild(iframe);
+    const doc=iframe.contentDocument;
+    const styles=`*{box-sizing:border-box;}body{font-family:Arial,sans-serif;padding:30px;color:#1C1C1E;font-size:13px;}
+    h1{font-size:22px;margin-bottom:4px;}h2{font-size:16px;color:#0A84FF;margin:20px 0 10px;border-bottom:2px solid #0A84FF;padding-bottom:6px;}
+    h3{font-size:13px;color:#636366;margin:0 0 16px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+    th{background:#f5f5f7;padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:#636366;text-transform:uppercase;}
+    td{padding:8px 10px;border-bottom:1px solid #e5e5ea;font-size:12px;}
+    .total{font-weight:800;font-size:14px;}.green{color:#1A7A35;}.red{color:#C0392B;}.blue{color:#0A84FF;}
+    .kpi{display:inline-block;background:#f5f5f7;border-radius:10px;padding:12px 20px;margin:0 8px 8px 0;min-width:140px;}
+    .kpi-label{font-size:11px;color:#636366;margin-bottom:4px;}.kpi-value{font-size:18px;font-weight:800;}
+    footer{margin-top:30px;padding-top:10px;border-top:1px solid #e5e5ea;text-align:center;font-size:11px;color:#8E8E93;}`;
+
+    let content="";
+
+    if(type==="financier"){
+      content=`<h1>📊 Rapport Financier — Angy Company</h1>
+      <h3>Année ${annee} · Généré le ${now.toLocaleDateString("fr-FR")}</h3>
+      <div>
+        <div class="kpi"><div class="kpi-label">Chiffre d'affaires</div><div class="kpi-value blue">${xof(totalCA)}</div></div>
+        <div class="kpi"><div class="kpi-label">Dépenses</div><div class="kpi-value red">${xof(totalDep)}</div></div>
+        <div class="kpi"><div class="kpi-label">Bénéfice net</div><div class="kpi-value ${benefice>=0?"green":"red"}">${xof(benefice)}</div></div>
+        <div class="kpi"><div class="kpi-label">Taux de marge</div><div class="kpi-value">${marge}%</div></div>
+      </div>
+      <h2>Résumé mensuel ${annee}</h2>
+      <table><thead><tr><th>Mois</th><th>CA</th><th>Dépenses</th><th>Bénéfice</th></tr></thead><tbody>
+      ${parMois.map(m=>`<tr><td>${m.mois}</td><td class="blue">${m.ca>0?xof(m.ca):"—"}</td><td class="red">${m.dep>0?xof(m.dep):"—"}</td><td class="${m.ben>=0?"green":"red"}">${m.ca>0||m.dep>0?xof(m.ben):"—"}</td></tr>`).join("")}
+      <tr><td class="total">TOTAL</td><td class="total blue">${xof(totalCA)}</td><td class="total red">${xof(totalDep)}</td><td class="total ${benefice>=0?"green":"red"}">${xof(benefice)}</td></tr>
+      </tbody></table>`;
+    }
+
+    if(type==="stock"){
+      const valTotale=stock.reduce((s,p)=>s+p.prix_achat*p.qte,0);
+      content=`<h1>📦 Rapport de Stock — Angy Company</h1>
+      <h3>Inventaire complet · ${now.toLocaleDateString("fr-FR")} · ${stock.length} produit(s)</h3>
+      <div>
+        <div class="kpi"><div class="kpi-label">Valeur totale stock</div><div class="kpi-value blue">${xof(valTotale)}</div></div>
+        <div class="kpi"><div class="kpi-label">Produits en rupture</div><div class="kpi-value red">${stock.filter(p=>p.qte===0).length}</div></div>
+        <div class="kpi"><div class="kpi-label">Produits en alerte</div><div class="kpi-value">${stock.filter(p=>p.qte>0&&p.qte<=p.seuil).length}</div></div>
+      </div>
+      <h2>Inventaire détaillé</h2>
+      <table><thead><tr><th>Produit</th><th>Catégorie</th><th>Qté</th><th>Seuil</th><th>Prix achat</th><th>Prix vente</th><th>Valeur stock</th><th>Statut</th></tr></thead><tbody>
+      ${stock.map(p=>{
+        const cat=catStk.find(c=>c.id===p.cat)||{label:p.cat||"—"};
+        const statut=p.qte===0?"RUPTURE":p.qte<=p.seuil?"ALERTE":"OK";
+        const color=p.qte===0?"red":p.qte<=p.seuil?"":"green";
+        return `<tr><td><strong>${p.nom}</strong></td><td>${cat.label}</td><td>${p.qte}</td><td>${p.seuil}</td><td>${xof(p.prix_achat)}</td><td>${xof(p.prix_vente)}</td><td>${xof(p.prix_achat*p.qte)}</td><td class="${color}">${statut}</td></tr>`;
+      }).join("")}
+      <tr><td class="total" colspan="6">TOTAL VALEUR STOCK</td><td class="total blue">${xof(valTotale)}</td><td></td></tr>
+      </tbody></table>`;
+    }
+
+    if(type==="ventes"){
+      content=`<h1>💸 Rapport des Ventes — Angy Company</h1>
+      <h3>${factures.length} facture(s) · CA total : ${xof(totalCA)} · ${now.toLocaleDateString("fr-FR")}</h3>
+      <h2>Top produits vendus</h2>
+      <table><thead><tr><th>Produit</th><th>Qté vendue</th><th>CA généré</th><th>% du CA</th></tr></thead><tbody>
+      ${topProduits.map(p=>`<tr><td><strong>${p.produit}</strong></td><td>${p.qte}</td><td class="blue">${xof(p.ca)}</td><td>${totalCA>0?Math.round((p.ca/totalCA)*100):0}%</td></tr>`).join("")}
+      </tbody></table>
+      <h2>Toutes les factures</h2>
+      <table><thead><tr><th>#</th><th>N° Facture</th><th>Client</th><th>Date</th><th>Total</th></tr></thead><tbody>
+      ${factures.map((f,i)=>`<tr><td>${i+1}</td><td class="blue">#${f.numero}</td><td>${f.client||"—"}</td><td>${f.date}</td><td class="total blue">${xof(f.total)}</td></tr>`).join("")}
+      <tr><td class="total" colspan="4">TOTAL</td><td class="total blue">${xof(totalCA)}</td></tr>
+      </tbody></table>`;
+    }
+
+    if(type==="depenses"){
+      const parCat={};
+      depenses.filter(d=>d.statut==="Approuvée").forEach(d=>{
+        if(!parCat[d.categorie])parCat[d.categorie]=0;
+        parCat[d.categorie]+=d.montant;
+      });
+      content=`<h1>📤 Rapport des Dépenses — Angy Company</h1>
+      <h3>${depenses.filter(d=>d.statut==="Approuvée").length} dépense(s) approuvée(s) · Total : ${xof(totalDep)} · ${now.toLocaleDateString("fr-FR")}</h3>
+      <h2>Par catégorie</h2>
+      <table><thead><tr><th>Catégorie</th><th>Montant</th><th>% du total</th></tr></thead><tbody>
+      ${Object.entries(parCat).sort((a,b)=>b[1]-a[1]).map(([cat,montant])=>`<tr><td>${cat}</td><td class="red">${xof(montant)}</td><td>${totalDep>0?Math.round((montant/totalDep)*100):0}%</td></tr>`).join("")}
+      </tbody></table>
+      <h2>Liste complète</h2>
+      <table><thead><tr><th>#</th><th>Titre</th><th>Catégorie</th><th>Date</th><th>Montant</th><th>Statut</th></tr></thead><tbody>
+      ${depenses.map((d,i)=>`<tr><td>${i+1}</td><td><strong>${d.titre}</strong></td><td>${d.categorie}</td><td>${d.date}</td><td class="${d.statut==="Approuvée"?"red":""}">${xof(d.montant)}</td><td>${d.statut}</td></tr>`).join("")}
+      <tr><td class="total" colspan="4">TOTAL APPROUVÉ</td><td class="total red">${xof(totalDep)}</td><td></td></tr>
+      </tbody></table>`;
+    }
+
+    doc.write(`<html><head><style>${styles}</style></head><body>${content}<footer>Angy Company · Parcelles Assainies U18, Dakar 🇸🇳 · Rapport officiel · ${now.toLocaleDateString("fr-FR")}</footer></body></html>`);
+    doc.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(()=>document.body.removeChild(iframe),1000);
+  };
+
+  return (
+    <div>
+      <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:"0 0 8px",color:theme.text}}>📋 Rapports</h1>
+      <p style={{color:theme.textMuted,fontSize:13,marginBottom:24}}>Cliquez sur un rapport pour l'imprimer ou l'enregistrer en PDF</p>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:16}}>
+        {[
+          {type:"financier",icon:"📊",title:"Rapport Financier",desc:"CA, dépenses, bénéfices par mois. Vue complète de la santé financière.",color:"#0A84FF",stats:`CA: ${xof(totalCA)} · Bénéfice: ${xof(benefice)}`},
+          {type:"stock",icon:"📦",title:"Rapport de Stock",desc:"Inventaire complet avec valeurs, alertes et ruptures.",color:"#FF9F0A",stats:`${stock.length} produits · Valeur: ${xof(stockVal)}`},
+          {type:"ventes",icon:"💸",title:"Rapport des Ventes",desc:"Top produits vendus et liste complète des factures.",color:"#30D158",stats:`${factures.length} factures · CA: ${xof(totalCA)}`},
+          {type:"depenses",icon:"📤",title:"Rapport des Dépenses",desc:"Dépenses par catégorie et liste complète détaillée.",color:"#FF453A",stats:`${depenses.filter(d=>d.statut==="Approuvée").length} approuvées · ${xof(totalDep)}`},
+        ].map(r=>(
+          <div key={r.type} style={{background:theme.bgCard,borderRadius:20,padding:"24px",border:`1px solid ${theme.border}`,boxShadow:theme.shadow,cursor:"pointer",transition:"all 0.2s"}}
+            onClick={()=>imprimer(r.type)}>
+            <div style={{fontSize:40,marginBottom:14}}>{r.icon}</div>
+            <div style={{fontSize:17,fontWeight:800,color:theme.text,marginBottom:8}}>{r.title}</div>
+            <div style={{fontSize:13,color:theme.textMuted,marginBottom:16,lineHeight:1.5}}>{r.desc}</div>
+            <div style={{fontSize:12,color:r.color,fontWeight:600,background:r.color+"15",padding:"6px 12px",borderRadius:8,marginBottom:16}}>{r.stats}</div>
+            <button style={{width:"100%",background:r.color,color:"#fff",border:"none",padding:"11px",borderRadius:12,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+              🖨️ Imprimer / PDF
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Rapport combiné */}
+      <div style={{marginTop:20,background:theme.bgCard,borderRadius:20,padding:"24px",border:`1px solid ${theme.border}`,boxShadow:theme.shadow}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:17,fontWeight:800,color:theme.text,marginBottom:4}}>📋 Rapport Complet Angy Company</div>
+            <div style={{fontSize:13,color:theme.textMuted}}>Tous les rapports en un seul document — financier, stock, ventes, dépenses</div>
+          </div>
+          <button onClick={()=>{["financier","stock","ventes","depenses"].forEach((t,i)=>setTimeout(()=>imprimer(t),i*500));}}
+            style={{background:"linear-gradient(135deg,#0A84FF,#BF5AF2)",color:"#fff",border:"none",padding:"12px 24px",borderRadius:12,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit",whiteSpace:"nowrap"}}>
+            🖨️ Tout imprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Gestion Utilisateurs Angy ────────────────────────────────────────────────
 function AngyUtilisateurs({showToast}) {
   const {theme}=useTheme();
@@ -1829,6 +2004,7 @@ export default function App() {
     ...(isAdmin||isVendeur?[{id:"ventes",label:"Ventes",icon:"💸"}]:[]),
     ...(isAdmin||isVendeur||isComptable?[{id:"factures",label:"Factures",icon:"🧾"}]:[]),
     ...(isAdmin||isComptable?[{id:"benefices",label:"Bénéfices",icon:"📈"}]:[]),
+    ...(isAdmin||isComptable?[{id:"rapports",label:"Rapports",icon:"📋"}]:[]),
     ...(isAdmin?[{id:"categories",label:"Catégories",icon:"🏷️"}]:[]),
     ...(isAdmin?[{id:"utilisateurs",label:"Utilisateurs",icon:"👥"}]:[]),
   ];
@@ -1886,6 +2062,7 @@ export default function App() {
               {page==="ventes"     &&<Ventes      ventes={ventes} setVentes={setVentes} factures={factures} catStk={catStk} showToast={showToast}/>}
               {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock} factures={factures}/>}
+              {page==="rapports"   &&<Rapports    depenses={depenses} stock={stock} ventes={ventes} factures={factures} catStk={catStk}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
               {page==="utilisateurs"&&<AngyUtilisateurs showToast={showToast}/>}
             </>
