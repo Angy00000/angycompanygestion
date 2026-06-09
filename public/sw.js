@@ -1,16 +1,33 @@
-const CACHE_NAME = "angy-v1";
-const URLS = ["/", "/index.html", "/src/main.jsx"];
+const CACHE_NAME = "angy-v2";
 
 self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(c => c.addAll(URLS))
-  );
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", e => {
+  e.waitUntil(clients.claim());
 });
 
 self.addEventListener("fetch", e => {
+  // Ne pas intercepter les requêtes Supabase
+  if(e.request.url.includes("supabase.co")) return;
+  
   e.respondWith(
-    fetch(e.request).catch(() =>
-      caches.match(e.request).then(r => r || caches.match("/"))
-    )
+    caches.open(CACHE_NAME).then(cache => {
+      return fetch(e.request)
+        .then(response => {
+          // Sauvegarder dans le cache
+          if(response.ok) {
+            cache.put(e.request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => {
+          // Hors ligne → utiliser le cache
+          return cache.match(e.request).then(cached => {
+            return cached || cache.match("/");
+          });
+        });
+    })
   );
 });
