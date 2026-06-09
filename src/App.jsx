@@ -560,7 +560,12 @@ function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast,recherch
 
   const isStockCat = CATS_STOCK.includes(form.cat);
 
-  const filtered=depenses.filter(d=>(fCat==="all"||d.cat===fCat)&&(fStat==="all"||d.statut===fStat));
+  const filtered=depenses.filter(d=>{
+    const catOk=fCat==="all"||d.cat===fCat;
+    const statOk=fStat==="all"||d.statut===fStat;
+    const searchOk=!search||d.titre?.toLowerCase().includes(search.toLowerCase());
+    return catOk&&statOk&&searchOk;
+  });
   const total=filtered.filter(d=>d.statut==="Approuvée").reduce((s,d)=>s+d.montant,0);
 
   const add=async()=>{
@@ -726,7 +731,11 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
 
   const [ajouterDepense,setAjouterDepense]=useState(false);
 
-  const filtered=stock.filter(p=>fCat==="all"||p.cat===fCat);
+  const filtered=stock.filter(p=>{
+    const catOk=fCat==="all"||p.cat===fCat;
+    const searchOk=!search||p.nom?.toLowerCase().includes(search.toLowerCase());
+    return catOk&&searchOk;
+  });
 
   const startEdit=(p)=>{setEditId(p.id);setEditForm({nom:p.nom,cat:p.cat,qte:p.qte,prix_achat:p.prix_achat,prix_vente:p.prix_vente,seuil:p.seuil});setShowAdd(false);setShowVente(null);};
   const saveEdit=async()=>{
@@ -908,12 +917,17 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
           </div>
         </Card>
       )}
+      {search&&<div style={{background:"rgba(10,132,255,0.1)",border:"1px solid rgba(10,132,255,0.3)",borderRadius:10,padding:"8px 14px",marginBottom:12,fontSize:13,color:"#0A84FF",fontWeight:600}}>
+        🔍 Résultats pour "{search}" · {filtered.length} produit(s) <button onClick={()=>setSearch("")} style={{background:"none",border:"none",color:"#0A84FF",cursor:"pointer",fontSize:13,marginLeft:8}}>✕ Effacer</button>
+      </div>}
       <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher un produit..."
+          style={{background:theme.input,border:`1px solid ${theme.border}`,borderRadius:9,padding:"8px 12px",color:theme.text,fontSize:13,outline:"none",fontFamily:"inherit",flex:1}}/>
         <SelFilter value={fCat} onChange={e=>setFCat(e.target.value)}>
           <option value="all">Toutes catégories</option>
           {catStk.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
         </SelFilter>
-        <div style={{marginLeft:"auto",fontSize:13,color:theme.textMuted}}>Valeur : <strong style={{color:"#FF9F0A"}}>{xof(stock.reduce((s,p)=>s+p.prix_achat*p.qte,0))}</strong></div>
+        <div style={{fontSize:13,color:theme.textMuted}}>Valeur : <strong style={{color:"#FF9F0A"}}>{xof(stock.reduce((s,p)=>s+p.prix_achat*p.qte,0))}</strong></div>
       </div>
       <TableWrap>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
