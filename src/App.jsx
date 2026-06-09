@@ -2179,6 +2179,8 @@ export default function App() {
   const [ancienMdp,setAncienMdp]=useState("");
   const [nouveauMdp,setNouveauMdp]=useState("");
   const [confirmMdp,setConfirmMdp]=useState("");
+  const [recherche,setRecherche]=useState("");
+  const [showRecherche,setShowRecherche]=useState(false);
 
   // Suit automatiquement le mode du téléphone/iPad
   useEffect(()=>{
@@ -2301,9 +2303,41 @@ export default function App() {
               </span>
             </div>
           )}
-          {/* Ligne 1 : Logo + User + Toggle */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px"}}>
+          {/* Ligne 1 : Logo + Recherche + User + Toggle */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",gap:12}}>
             <AngyLogo height={52}/>
+            {/* Barre de recherche globale */}
+            <div style={{flex:1,maxWidth:420,position:"relative"}}>
+              <input value={recherche} onChange={e=>{setRecherche(e.target.value);setShowRecherche(e.target.value.length>1);}}
+                onBlur={()=>setTimeout(()=>setShowRecherche(false),200)}
+                onFocus={()=>recherche.length>1&&setShowRecherche(true)}
+                placeholder="🔍 Rechercher produit, client, facture..."
+                style={{width:"100%",background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:12,padding:"9px 16px",color:theme.text,fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+              {showRecherche&&(()=>{
+                const q=recherche.toLowerCase();
+                const results=[
+                  ...stock.filter(p=>p.nom?.toLowerCase().includes(q)).map(p=>({type:"📦",titre:p.nom,sub:`${p.qte} unités · ${xof(p.prix_vente)}`,page:"stock"})),
+                  ...factures.filter(f=>f.client?.toLowerCase().includes(q)||f.numero?.toLowerCase().includes(q)).map(f=>({type:"🧾",titre:`#${f.numero} — ${f.client}`,sub:`${f.date} · ${xof(f.total)}`,page:"factures"})),
+                  ...depenses.filter(d=>d.titre?.toLowerCase().includes(q)).map(d=>({type:"📤",titre:d.titre,sub:`${d.date} · ${xof(d.montant)}`,page:"depenses"})),
+                  ...clients.filter(c=>c.nom?.toLowerCase().includes(q)||c.telephone?.includes(q)).map(c=>({type:"👥",titre:c.nom,sub:c.telephone||"",page:"clients"})),
+                ].slice(0,7);
+                if(results.length===0)return <div style={{position:"absolute",top:"100%",left:0,right:0,background:theme.bgCard,border:`1px solid ${theme.border}`,borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.3)",zIndex:999,marginTop:4,padding:"14px 16px",fontSize:13,color:theme.textMuted}}>Aucun résultat</div>;
+                return (
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:theme.bgCard,border:`1px solid ${theme.border}`,borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.3)",zIndex:999,marginTop:4,overflow:"hidden"}}>
+                    {results.map((r,i)=>(
+                      <div key={i} onClick={()=>{setPage(r.page);setRecherche("");setShowRecherche(false);}}
+                        style={{padding:"10px 16px",cursor:"pointer",borderBottom:`1px solid ${theme.borderLight}`,display:"flex",gap:10,alignItems:"center",transition:"background 0.1s"}}>
+                        <span style={{fontSize:16}}>{r.type}</span>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:600,color:theme.text}}>{r.titre}</div>
+                          <div style={{fontSize:11,color:theme.textMuted}}>{r.sub}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{fontSize:11,color:theme.textMuted}}>📍 Parcelles Assainies U18, Dakar</div>
               <div style={{fontSize:11,color:"#0A84FF",fontWeight:700,background:"rgba(10,132,255,0.12)",padding:"4px 10px",borderRadius:99}}>
@@ -2311,7 +2345,7 @@ export default function App() {
               </div>
               <button onClick={()=>setChangeMdp(true)} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"5px 10px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🔑</button>
               <ThemeToggle/>
-              <button onClick={()=>{clearAngySession();setUser(null);}} style={{background:"rgba(255,69,58,0.12)",border:"1px solid #FF453A",color:"#FF453A",padding:"5px 12px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>🚪</button>
+              <button onClick={()=>{clearAngySession();window.location.reload();}} style={{background:"rgba(255,69,58,0.12)",border:"1px solid #FF453A",color:"#FF453A",padding:"5px 12px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>🚪</button>
             </div>
           </div>
           {/* Ligne 2 : Navigation */}
