@@ -1489,6 +1489,192 @@ function Ventes({ventes,setVentes,factures,catStk,showToast}) {
   );
 }
 
+// ─── Clients ──────────────────────────────────────────────────────────────────
+function Clients({clients,setClients,factures,showToast}) {
+  const {theme}=useTheme();
+  const [show,setShow]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [search,setSearch]=useState("");
+  const [selected,setSelected]=useState(null);
+  const [form,setForm]=useState({nom:"",telephone:"",email:"",adresse:"",type:"Particulier",note:""});
+
+  const filtered=clients.filter(c=>{
+    const q=search.toLowerCase();
+    return !q||(c.nom+c.telephone+(c.email||"")).toLowerCase().includes(q);
+  });
+
+  // Historique achats d'un client
+  const getAchats=(clientNom)=>factures.filter(f=>f.client===clientNom);
+  const getTotalAchats=(clientNom)=>getAchats(clientNom).reduce((s,f)=>s+f.total,0);
+
+  // Top clients
+  const topClients=[...clients].sort((a,b)=>getTotalAchats(b.nom)-getTotalAchats(a.nom));
+
+  const add=async()=>{
+    if(!form.nom)return showToast("Nom requis",true);
+    if(editId){
+      await dbPatch("clients",editId,form);
+      setClients(clients.map(c=>c.id===editId?{...c,...form}:c));
+      setEditId(null);showToast("Client modifié ✓");
+    } else {
+      const rows=await dbAdd("clients",form);
+      setClients([rows[0],...clients]);
+      showToast("Client ajouté ✓");
+    }
+    setForm({nom:"",telephone:"",email:"",adresse:"",type:"Particulier",note:""});
+    setShow(false);
+  };
+
+  const startEdit=(c)=>{setForm({nom:c.nom,telephone:c.telephone||"",email:c.email||"",adresse:c.adresse||"",type:c.type||"Particulier",note:c.note||""});setEditId(c.id);setShow(true);};
+  const del=async(id)=>{await dbDel("clients",id);setClients(clients.filter(c=>c.id!==id));showToast("Supprimé");};
+
+  const imprimer=()=>{
+    const iframe=document.createElement("iframe");
+    iframe.style.display="none";
+    document.body.appendChild(iframe);
+    let rows="";
+    topClients.forEach((c,i)=>{
+      const total=getTotalAchats(c.nom);
+      const achats=getAchats(c.nom).length;
+      rows+=`<tr><td>${i+1}</td><td><strong>${c.nom}</strong></td><td>${c.telephone||"—"}</td><td>${c.type}</td><td>${achats}</td><td><strong>${xof(total)}</strong></td></tr>`;
+    });
+    iframe.contentDocument.write(`<html><head><title>Clients — Angy Company</title><style>*{box-sizing:border-box;}body{font-family:Arial,sans-serif;padding:30px;color:#1C1C1E;}h1{font-size:18px;}table{width:100%;border-collapse:collapse;margin-top:14px;}th,td{border:1px solid #e5e5ea;padding:7px 10px;font-size:12px;text-align:left;}th{background:#f5f5f7;font-weight:700;}</style></head><body>
+    <h1>Angy Company — Liste des clients</h1>
+    <p style="color:#636366;font-size:12px;">${clients.length} client(s) · ${new Date().toLocaleDateString("fr-FR")}</p>
+    <table><thead><tr><th>#</th><th>Nom</th><th>Téléphone</th><th>Type</th><th>Achats</th><th>Total dépensé</th></tr></thead><tbody>${rows}</tbody></table>
+    </body></html>`);
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(()=>document.body.removeChild(iframe),1000);
+  };
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>👥 Clients ({clients.length})</h1>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={imprimer} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"8px 16px",borderRadius:10,cursor:"pointer",fontSize:13,fontFamily:"inherit",fontWeight:600}}>🖨️ Imprimer</button>
+          <button onClick={()=>{setShow(!show);setEditId(null);setForm({nom:"",telephone:"",email:"",adresse:"",type:"Particulier",note:""}); setSelected(null);}}
+            style={{background:"#0A84FF",color:"#fff",border:"none",padding:"9px 20px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+            {show?"✕ Annuler":"+ Nouveau client"}
+          </button>
+        </div>
+      </div>
+
+      {/* Formulaire */}
+      {show&&(
+        <div style={{background:theme.bgCard,borderRadius:16,padding:"20px 22px",border:`1px solid ${theme.border}`,marginBottom:16,boxShadow:theme.shadow}}>
+          <div style={{fontSize:14,fontWeight:700,color:theme.text,marginBottom:14}}>{editId?"✏️ Modifier":"Nouveau client"}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
+            {[["Nom *","nom","text","Nom du client"],["Téléphone","telephone","tel","+221 77 000 00 00"],["Email","email","email","client@email.com"],["Adresse","adresse","text","Dakar, Sénégal"],["Note","note","text","Optionnel"]].map(([label,key,type,placeholder])=>(
+              <div key={key} style={{display:"flex",flexDirection:"column",gap:5}}>
+                <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>{label}</label>
+                <input type={type} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} placeholder={placeholder}
+                  style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"9px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+              </div>
+            ))}
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Type</label>
+              <select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}
+                style={{background:theme.sel,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"9px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit",cursor:"pointer"}}>
+                {["Particulier","Entreprise","Revendeur","VIP"].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={add} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 22px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+              {editId?"💾 Sauvegarder":"Ajouter"}
+            </button>
+            {editId&&<button onClick={()=>{setEditId(null);setShow(false);}} style={{background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,padding:"10px 18px",borderRadius:10,fontWeight:600,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>Annuler</button>}
+          </div>
+        </div>
+      )}
+
+      {/* Fiche client détaillée */}
+      {selected&&(()=>{
+        const achats=getAchats(selected.nom);
+        const total=getTotalAchats(selected.nom);
+        return (
+          <div style={{background:theme.bgCard,borderRadius:16,padding:"20px 22px",border:`1px solid #0A84FF44`,marginBottom:16,boxShadow:theme.shadow}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+              <div style={{display:"flex",gap:14,alignItems:"center"}}>
+                <div style={{width:52,height:52,borderRadius:14,background:"rgba(10,132,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>👤</div>
+                <div>
+                  <div style={{fontSize:18,fontWeight:800,color:theme.text}}>{selected.nom}</div>
+                  <div style={{fontSize:12,color:theme.textMuted}}>{selected.type} · {selected.telephone||"—"}</div>
+                  {selected.email&&<div style={{fontSize:12,color:theme.textMuted}}>{selected.email}</div>}
+                </div>
+              </div>
+              <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:theme.textMuted,cursor:"pointer",fontSize:18}}>✕</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
+              <KPI label="Total dépensé" value={xof(total)} accent="#0A84FF" icon="💰" sub={`${achats.length} achat(s)`}/>
+              <KPI label="Dernier achat" value={achats[0]?.date||"—"} accent="#30D158" icon="📅" sub="Date"/>
+              <KPI label="Panier moyen" value={achats.length>0?xof(Math.round(total/achats.length)):"—"} accent="#FF9F0A" icon="🛒" sub="Par achat"/>
+            </div>
+            <div style={{fontSize:13,fontWeight:700,color:theme.text,marginBottom:10}}>Historique des achats</div>
+            {achats.length===0
+              ?<div style={{color:theme.textMuted,fontSize:13}}>Aucun achat enregistré</div>
+              :<div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead><tr>{["N° Facture","Date","Montant"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:11,fontWeight:600,color:theme.textMuted,background:theme.tableHead,borderBottom:`1px solid ${theme.border}`}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {achats.map(f=>(
+                      <tr key={f.id} style={{borderBottom:`1px solid ${theme.borderLight}`}}>
+                        <td style={{padding:"8px 12px",color:"#BF5AF2",fontWeight:600}}>#{f.numero}</td>
+                        <td style={{padding:"8px 12px",color:theme.textMuted,fontSize:12}}>{f.date}</td>
+                        <td style={{padding:"8px 12px",fontWeight:700,color:"#0A84FF"}}>{xof(f.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        );
+      })()}
+
+      {/* Recherche */}
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher un client..."
+        style={{width:"100%",background:theme.input,border:`1px solid ${theme.border}`,borderRadius:9,padding:"9px 14px",color:theme.text,fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:16}}/>
+
+      {/* Liste clients */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+        {filtered.length===0&&<div style={{color:theme.textMuted,fontSize:13,gridColumn:"1/-1",textAlign:"center",padding:"2rem"}}>Aucun client</div>}
+        {filtered.map(c=>{
+          const total=getTotalAchats(c.nom);
+          const achats=getAchats(c.nom).length;
+          const typeColor=c.type==="VIP"?"#FF9F0A":c.type==="Entreprise"?"#0A84FF":c.type==="Revendeur"?"#BF5AF2":"#30D158";
+          return (
+            <div key={c.id} style={{background:theme.bgCard,borderRadius:16,padding:"18px 20px",border:`1px solid ${theme.border}`,boxShadow:theme.shadow,cursor:"pointer"}}
+              onClick={()=>setSelected(c)}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                  <div style={{width:40,height:40,borderRadius:12,background:"rgba(10,132,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>👤</div>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700,color:theme.text}}>{c.nom}</div>
+                    <div style={{fontSize:11,color:theme.textMuted}}>{c.telephone||"—"}</div>
+                  </div>
+                </div>
+                <span style={{background:typeColor+"22",color:typeColor,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:600}}>{c.type}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:`1px solid ${theme.borderLight}`}}>
+                <div style={{fontSize:12,color:theme.textMuted}}>{achats} achat{achats!==1?"s":""}</div>
+                <div style={{fontSize:13,fontWeight:700,color:"#0A84FF"}}>{total>0?xof(total):"Nouveau"}</div>
+              </div>
+              <div style={{display:"flex",gap:6,marginTop:10}}>
+                <button onClick={e=>{e.stopPropagation();startEdit(c);}} style={{flex:1,background:"rgba(255,159,10,0.12)",border:"1px solid #FF9F0A",color:"#FF9F0A",padding:"6px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>✏️</button>
+                <button onClick={e=>{e.stopPropagation();del(c.id);}} style={{background:"none",border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"6px 10px",borderRadius:8,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🗑</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Rapports ─────────────────────────────────────────────────────────────────
 function Rapports({depenses,stock,ventes,factures,catStk}) {
   const {theme}=useTheme();
@@ -1922,6 +2108,7 @@ export default function App() {
   const [stock,setStock]=useState([]);
   const [ventes,setVentes]=useState([]);
   const [factures,setFactures]=useState([]);
+  const [clients,setClients]=useState([]);
   const [catDep,setCatDep]=useState(DEFAULT_CAT_DEP);
   const [catStk,setCatStk]=useState(DEFAULT_CAT_STK);
   const [loading,setLoading]=useState(true);
@@ -1949,17 +2136,20 @@ export default function App() {
       setStock(cache.stock||[]);
       setVentes(cache.ventes||[]);
       setFactures(cache.factures||[]);
+      setClients(cache.clients||[]);
     }
     // Puis essayer Supabase
     (async()=>{
       try{
-        const [d,s,v,f]=await Promise.all([
+        const [d,s,v,f,c]=await Promise.all([
           dbGet("depenses"),dbGet("stock"),
-          dbGet("ventes"),dbGet("factures").catch(()=>[])
+          dbGet("ventes"),dbGet("factures").catch(()=>[]),
+          dbGet("clients").catch(()=>[])
         ]);
-        const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[]};
+        const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[],clients:c||[]};
         setDepenses(data.depenses);setStock(data.stock);
         setVentes(data.ventes);setFactures(data.factures);
+        setClients(data.clients);
         saveAngyCache(data);
         setOffline(false);
       }catch(e){
@@ -2003,6 +2193,7 @@ export default function App() {
     ...(isAdmin||isVendeur?[{id:"stock",label:"Stock",icon:"📦",badge:alertes}]:[]),
     ...(isAdmin||isVendeur?[{id:"ventes",label:"Ventes",icon:"💸"}]:[]),
     ...(isAdmin||isVendeur||isComptable?[{id:"factures",label:"Factures",icon:"🧾"}]:[]),
+    ...(isAdmin||isVendeur?[{id:"clients",label:"Clients",icon:"👥"}]:[]),
     ...(isAdmin||isComptable?[{id:"benefices",label:"Bénéfices",icon:"📈"}]:[]),
     ...(isAdmin||isComptable?[{id:"rapports",label:"Rapports",icon:"📋"}]:[]),
     ...(isAdmin?[{id:"categories",label:"Catégories",icon:"🏷️"}]:[]),
@@ -2060,7 +2251,8 @@ export default function App() {
               {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} stock={stock} setStock={setStock} showToast={showToast}/>}
               {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} depenses={depenses} setDepenses={setDepenses} catStk={catStk} showToast={showToast} setPage={setPage}/>}
               {page==="ventes"     &&<Ventes      ventes={ventes} setVentes={setVentes} factures={factures} catStk={catStk} showToast={showToast}/>}
-              {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast}/>}
+              {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} clients={clients}/>}
+              {page==="clients"    &&<Clients     clients={clients} setClients={setClients} factures={factures} showToast={showToast}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock} factures={factures}/>}
               {page==="rapports"   &&<Rapports    depenses={depenses} stock={stock} ventes={ventes} factures={factures} catStk={catStk}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
