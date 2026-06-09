@@ -158,7 +158,7 @@ const exportCSV = (data, filename) => {
   const headers=Object.keys(data[0]);
   const rows=data.map(row=>headers.map(h=>{
     const val=row[h]===null||row[h]===undefined?"":String(row[h]);
-    return val.includes(",")?"\""+val+"\"":val;
+    return `"${val.replace(/"/g,'""')}"`;
   }).join(","));
   const csv=[headers.join(","),...rows].join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
@@ -169,23 +169,7 @@ const exportCSV = (data, filename) => {
   document.body.removeChild(a);URL.revokeObjectURL(url);
 };
 
-const exportExcel = (data, filename, sheetName="Données") => {
-  if(!data||data.length===0)return;
-  const headers=Object.keys(data[0]);
-  // Créer XML Excel (format XLSX simplifié via CSV avec extension xlsx)
-  // On utilise le format CSV avec BOM pour compatibilité Excel
-  const rows=data.map(row=>headers.map(h=>{
-    const val=row[h]===null||row[h]===undefined?"":String(row[h]);
-    return `"${val.replace(/"/g,'""')}"`;
-  }).join("\t"));
-  const tsv=[headers.join("\t"),...rows].join("\n");
-  const blob=new Blob(["\uFEFF"+tsv],{type:"application/vnd.ms-excel;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=filename+".xls";
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);URL.revokeObjectURL(url);
-};
+const exportExcel = (data, filename) => exportCSV(data, filename);
 
 // ─── UI Components ────────────────────────────────────────────────────────────
 const Badge = ({s}) => {
