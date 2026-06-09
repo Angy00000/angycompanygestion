@@ -1164,7 +1164,11 @@ function AngyLogin({onLogin}) {
   const login=()=>{
     const users=loadAngyUsers();
     const user=users.find(u=>u.email===email&&u.mot_de_passe===mdp&&u.actif);
-    if(user){saveAngySession(user);onLogin(user);}
+    if(user){
+      saveAngySession(user);
+      onLogin(user);
+      window.location.reload(); // Force reload pour éviter page blanche
+    }
     else setErreur("Email ou mot de passe incorrect");
   };
 
