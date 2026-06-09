@@ -174,80 +174,169 @@ const ThemeToggle = () => {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({depenses,stock,ventes,factures}) {
   const {theme}=useTheme();
-  const totalDep=depenses.filter(d=>d.statut==="Approuvée").reduce((s,d)=>s+d.montant,0);
-  // CA calculé depuis les factures (source de vérité unique)
+  const now=new Date();
+  const moisCourant=now.toISOString().slice(0,7);
+  const hier=new Date(now-86400000).toISOString().split("T")[0];
+  const todayStr=now.toISOString().split("T")[0];
+
+  // CA total
   const totalCA=factures.reduce((s,f)=>s+f.total,0);
+  const totalDep=depenses.filter(d=>d.statut==="Approuvée").reduce((s,d)=>s+d.montant,0);
   const stockVal=stock.reduce((s,p)=>s+p.prix_achat*p.qte,0);
   const benefice=totalCA-totalDep;
+  const marge=totalCA>0?Math.round((benefice/totalCA)*100):0;
+
+  // CA aujourd'hui
+  const caAujourdhui=factures.filter(f=>f.date===todayStr).reduce((s,f)=>s+f.total,0);
+  const caHier=factures.filter(f=>f.date===hier).reduce((s,f)=>s+f.total,0);
+  const caMois=factures.filter(f=>f.date?.startsWith(moisCourant)).reduce((s,f)=>s+f.total,0);
+
+  // Alertes stock
   const alertes=stock.filter(p=>p.qte<=p.seuil);
-  const mois=["Jan","Fév","Mar","Avr","Mai","Jun"];
-  const ventesData=[420000,680000,540000,820000,960000,Math.max(totalCA,1)];
-  const maxV=Math.max(...ventesData);
+  const ruptures=stock.filter(p=>p.qte===0);
+
+  // Top produits depuis factures
+  const byProd={};
+  factures.forEach(f=>{
+    try{
+      const lignes=typeof f.lignes==="string"?JSON.parse(f.lignes):f.lignes||[];
+      lignes.forEach(l=>{
+        if(!l.desc)return;
+        if(!byProd[l.desc])byProd[l.desc]={produit:l.desc,qte:0,ca:0};
+        byProd[l.desc].qte+=l.qte||1;
+        byProd[l.desc].ca+=(l.qte||1)*(l.pu||0);
+      });
+    }catch(e){}
+  });
+  const top5=Object.values(byProd).sort((a,b)=>b.ca-a.ca).slice(0,5);
+
+  // Graphique par mois (données réelles)
+  const MOIS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+  const ventesParMois=MOIS.map((_,i)=>{
+    const mm=String(i+1).padStart(2,"0");
+    return factures.filter(f=>f.date?.slice(5,7)===mm&&f.date?.startsWith(String(now.getFullYear()))).reduce((s,f)=>s+f.total,0);
+  });
+  const maxV=Math.max(...ventesParMois,1);
+  const moisLabels=MOIS.slice(0,now.getMonth()+1);
+  const ventesLabels=ventesParMois.slice(0,now.getMonth()+1);
+
   return (
     <div>
-      <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:"0 0 22px",color:theme.text}}>Tableau de bord</h1>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
-        <KPI label="Chiffre d'affaires" value={xof(totalCA)} accent="#0A84FF" icon="💰" sub={`${factures.length} factures`}/>
-        <KPI label="Dépenses approuvées" value={xof(totalDep)} accent="#FF453A" icon="📤" sub={`${depenses.filter(d=>d.statut==="Approuvée").length} entrées`}/>
-        <KPI label="Bénéfice net" value={xof(benefice)} accent={benefice>=0?"#30D158":"#FF453A"} icon="📈" sub="CA − dépenses"/>
-        <KPI label="Valeur du stock" value={xof(stockVal)} accent="#FF9F0A" icon="📦" sub={`${stock.length} produits`}/>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>Tableau de bord</h1>
+        <div style={{fontSize:12,color:theme.textMuted}}>{now.toLocaleDateString("fr-SN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
       </div>
+
+      {/* KPIs principaux */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+        <KPI label="Chiffre d'affaires" value={xof(totalCA)} accent="#0A84FF" icon="💰" sub={`${factures.length} facture${factures.length!==1?"s":""}`}/>
+        <KPI label="Bénéfice net" value={xof(benefice)} accent={benefice>=0?"#30D158":"#FF453A"} icon={benefice>=0?"📈":"📉"} sub={`Marge : ${marge}%`}/>
+        <KPI label="Dépenses" value={xof(totalDep)} accent="#FF453A" icon="📤" sub={`${depenses.filter(d=>d.statut==="Approuvée").length} approuvées`}/>
+        <KPI label="Valeur stock" value={xof(stockVal)} accent="#FF9F0A" icon="📦" sub={`${stock.length} produit${stock.length!==1?"s":""}`}/>
+      </div>
+
+      {/* KPIs secondaires */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+        <KPI label="CA aujourd'hui" value={xof(caAujourdhui)} accent="#30D158" icon="🌅" sub={caHier>0?`Hier : ${xof(caHier)}`:"Premier jour"}/>
+        <KPI label="CA ce mois" value={xof(caMois)} accent="#0A84FF" icon="📅" sub={moisCourant}/>
+        <KPI label="Ruptures de stock" value={ruptures.length} accent="#FF453A" icon="🚨" sub={`${alertes.length} en alerte`}/>
+        <KPI label="Taux de marge" value={`${marge}%`} accent={marge>=20?"#30D158":marge>=10?"#FF9F0A":"#FF453A"} icon="%" sub="Bénéfice / CA"/>
+      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:14}}>
+        {/* Graphique réel */}
         <Card>
-          <CardTitle>Évolution des ventes</CardTitle>
-          <div style={{display:"flex",alignItems:"flex-end",gap:10,height:130,paddingTop:10}}>
-            {mois.map((m,i)=>(
-              <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-                <div style={{fontSize:9,color:theme.textMuted}}>{Math.round(ventesData[i]/1000)}k</div>
-                <div style={{width:"100%",background:i===5?"#0A84FF":"rgba(10,132,255,0.2)",height:`${Math.max(8,Math.round((ventesData[i]/maxV)*100))}px`,borderRadius:"5px 5px 0 0"}}/>
-                <div style={{fontSize:11,color:i===5?"#0A84FF":theme.textMuted,fontWeight:i===5?700:400}}>{m}</div>
+          <CardTitle>📊 Évolution des ventes {now.getFullYear()}</CardTitle>
+          <div style={{display:"flex",alignItems:"flex-end",gap:8,height:130,paddingTop:10}}>
+            {moisLabels.map((m,i)=>(
+              <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                <div style={{fontSize:9,color:theme.textMuted}}>{ventesLabels[i]>0?Math.round(ventesLabels[i]/1000)+"k":""}</div>
+                <div style={{width:"100%",background:i===moisLabels.length-1?"#0A84FF":ventesLabels[i]>0?"rgba(10,132,255,0.4)":theme.border,
+                  height:`${Math.max(4,Math.round((ventesLabels[i]/maxV)*110))}px`,borderRadius:"5px 5px 0 0",transition:"height 0.3s"}}/>
+                <div style={{fontSize:10,color:i===moisLabels.length-1?"#0A84FF":theme.textMuted,fontWeight:i===moisLabels.length-1?700:400}}>{m}</div>
               </div>
             ))}
           </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:10,paddingTop:10,borderTop:`1px solid ${theme.borderLight}`}}>
+            <div style={{fontSize:12,color:theme.textMuted}}>Total {now.getFullYear()}</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#0A84FF"}}>{xof(totalCA)}</div>
+          </div>
         </Card>
+
+        {/* Alertes stock */}
         <Card>
-          <CardTitle>⚠️ Alertes stock ({alertes.length})</CardTitle>
+          <CardTitle>⚠️ Stock critique ({alertes.length})</CardTitle>
           {alertes.length===0
             ?<div style={{color:"#30D158",fontSize:13,marginTop:12}}>✓ Tout le stock est OK</div>
-            :alertes.map(p=>(
-              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${theme.borderLight}`}}>
+            :alertes.slice(0,6).map(p=>(
+              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${theme.borderLight}`}}>
                 <div>
-                  <div style={{fontSize:13,fontWeight:600,color:theme.text}}>{p.nom}</div>
-                  <div style={{fontSize:11,color:theme.textMuted}}>Seuil: {p.seuil}</div>
+                  <div style={{fontSize:12,fontWeight:600,color:theme.text}}>{p.nom}</div>
+                  <div style={{fontSize:10,color:theme.textMuted}}>Seuil: {p.seuil}</div>
                 </div>
-                <span style={{background:p.qte===0?theme.badgeRej.bg:theme.badgePend.bg,color:p.qte===0?theme.badgeRej.color:theme.badgePend.color,padding:"3px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>{p.qte} unité{p.qte!==1?"s":""}</span>
+                <span style={{background:p.qte===0?"#3A1C1C":"#3A2F1C",color:p.qte===0?"#FF453A":"#FF9F0A",padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:700}}>
+                  {p.qte===0?"RUPTURE":`${p.qte} unité${p.qte!==1?"s":""}`}
+                </span>
               </div>
             ))
           }
         </Card>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
+        {/* Top produits */}
         <Card>
-          <CardTitle>Dernières factures</CardTitle>
-          {factures.length===0?<div style={{color:theme.textMuted,fontSize:13}}>Aucune facture</div>:factures.slice(0,4).map(f=>(
-            <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:`1px solid ${theme.borderLight}`}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:theme.text}}>Facture #{f.numero}</div>
-                <div style={{fontSize:11,color:theme.textMuted}}>{f.client} · {f.date}</div>
+          <CardTitle>🏆 Top 5 produits</CardTitle>
+          {top5.length===0
+            ?<div style={{color:theme.textMuted,fontSize:13}}>Aucune vente</div>
+            :top5.map((p,i)=>(
+              <div key={p.produit} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${theme.borderLight}`}}>
+                <div style={{width:22,height:22,borderRadius:6,background:"rgba(10,132,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#0A84FF",flexShrink:0}}>{i+1}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:theme.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.produit}</div>
+                  <div style={{fontSize:10,color:theme.textMuted}}>×{p.qte} vendu{p.qte>1?"s":""}</div>
+                </div>
+                <div style={{fontWeight:700,color:"#30D158",fontSize:12,flexShrink:0}}>{xof(p.ca)}</div>
               </div>
-              <div style={{fontWeight:700,color:"#BF5AF2",fontSize:13}}>{xof(f.total)}</div>
-            </div>
-          ))}
+            ))
+          }
         </Card>
+
+        {/* Dernières factures */}
         <Card>
-          <CardTitle>Dernières dépenses</CardTitle>
-          {depenses.slice(0,4).map(d=>(
-            <div key={d.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:`1px solid ${theme.borderLight}`}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:theme.text}}>{d.titre}</div>
-                <div style={{fontSize:11,color:theme.textMuted}}>{d.date}</div>
+          <CardTitle>🧾 Dernières factures</CardTitle>
+          {factures.length===0
+            ?<div style={{color:theme.textMuted,fontSize:13}}>Aucune facture</div>
+            :factures.slice(0,5).map(f=>(
+              <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${theme.borderLight}`}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:"#BF5AF2"}}>#{f.numero}</div>
+                  <div style={{fontSize:10,color:theme.textMuted}}>{f.client} · {f.date}</div>
+                </div>
+                <div style={{fontWeight:700,color:"#0A84FF",fontSize:12}}>{xof(f.total)}</div>
               </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#FF453A"}}>{xof(d.montant)}</div>
-                <Badge s={d.statut}/>
+            ))
+          }
+        </Card>
+
+        {/* Dernières dépenses */}
+        <Card>
+          <CardTitle>📤 Dernières dépenses</CardTitle>
+          {depenses.length===0
+            ?<div style={{color:theme.textMuted,fontSize:13}}>Aucune dépense</div>
+            :depenses.slice(0,5).map(d=>(
+              <div key={d.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${theme.borderLight}`}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:theme.text}}>{d.titre}</div>
+                  <div style={{fontSize:10,color:theme.textMuted}}>{d.date}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#FF453A"}}>{xof(d.montant)}</div>
+                  <Badge s={d.statut}/>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          }
         </Card>
       </div>
     </div>
@@ -1191,23 +1280,6 @@ function Benefices({depenses,ventes,stock,factures}) {
           </div>
         }
       </Card>
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead><tr>{["Produit","Client","Qté","Prix unit.","Total","Date"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
-          <tbody>
-            {vF.length===0&&<tr><Td colSpan={6} style={{textAlign:"center",color:theme.textMuted,padding:"1.5rem"}}>Aucune vente</Td></tr>}
-            {vF.map(v=>(
-              <tr key={v.id}>
-                <Td><strong style={{color:theme.text}}>{v.produit}</strong></Td>
-                <Td style={{color:theme.textSub}}>{v.client}</Td>
-                <Td>{v.qte}</Td>
-                <Td style={{color:theme.textMuted}}>{xof(v.prix_vente)}</Td>
-                <Td style={{fontWeight:700,color:"#30D158"}}>{xof(v.prix_vente*v.qte)}</Td>
-                <Td style={{color:theme.textMuted,fontSize:13}}>{v.date}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
     </div>
   );
 }
@@ -1611,7 +1683,7 @@ export default function App() {
 
   const isAdmin=user?.role==="admin";
   const isVendeur=user?.role==="vendeur";
-  const isComptable=user?.role==="comptable";;
+  const isComptable=user?.role==="comptable";
 
   useEffect(()=>{
     (async()=>{
