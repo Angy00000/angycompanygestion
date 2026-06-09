@@ -1298,7 +1298,7 @@ export default function App() {
               </div>
               <button onClick={()=>setChangeMdp(true)} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"5px 10px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🔑</button>
               <ThemeToggle/>
-              <button onClick={()=>{clearAngySession();setUser(null);}} style={{background:"rgba(255,69,58,0.12)",border:"1px solid #FF453A",color:"#FF453A",padding:"5px 12px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>🚪</button>
+              <button onClick={()=>{clearAngySession();window.location.reload();}} style={{background:"rgba(255,69,58,0.12)",border:"1px solid #FF453A",color:"#FF453A",padding:"5px 12px",borderRadius:9,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>🚪</button>
             </div>
           </div>
           {/* Ligne 2 : Navigation */}
