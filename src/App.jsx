@@ -175,22 +175,22 @@ const ThemeToggle = () => {
 function Dashboard({depenses,stock,ventes,factures}) {
   const {theme}=useTheme();
   const totalDep=depenses.filter(d=>d.statut==="Approuvée").reduce((s,d)=>s+d.montant,0);
-  const totalVentes=ventes.reduce((s,v)=>s+v.prix_vente*v.qte,0);
-  const totalFactures=factures.reduce((s,f)=>s+f.total,0);
+  // CA calculé depuis les factures (source de vérité unique)
+  const totalCA=factures.reduce((s,f)=>s+f.total,0);
   const stockVal=stock.reduce((s,p)=>s+p.prix_achat*p.qte,0);
-  const benefice=totalVentes-totalDep;
+  const benefice=totalCA-totalDep;
   const alertes=stock.filter(p=>p.qte<=p.seuil);
   const mois=["Jan","Fév","Mar","Avr","Mai","Jun"];
-  const ventesData=[420000,680000,540000,820000,960000,Math.max(totalVentes,1)];
+  const ventesData=[420000,680000,540000,820000,960000,Math.max(totalCA,1)];
   const maxV=Math.max(...ventesData);
   return (
     <div>
       <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:"0 0 22px",color:theme.text}}>Tableau de bord</h1>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
-        <KPI label="Chiffre d'affaires" value={xof(totalVentes)} accent="#0A84FF" icon="💰" sub={`${ventes.length} ventes`}/>
+        <KPI label="Chiffre d'affaires" value={xof(totalCA)} accent="#0A84FF" icon="💰" sub={`${factures.length} factures`}/>
         <KPI label="Dépenses approuvées" value={xof(totalDep)} accent="#FF453A" icon="📤" sub={`${depenses.filter(d=>d.statut==="Approuvée").length} entrées`}/>
         <KPI label="Bénéfice net" value={xof(benefice)} accent={benefice>=0?"#30D158":"#FF453A"} icon="📈" sub="CA − dépenses"/>
-        <KPI label="Factures émises" value={xof(totalFactures)} accent="#BF5AF2" icon="🧾" sub={`${factures.length} factures`}/>
+        <KPI label="Valeur du stock" value={xof(stockVal)} accent="#FF9F0A" icon="📦" sub={`${stock.length} produits`}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:14}}>
         <Card>
@@ -829,7 +829,13 @@ function Factures({factures,setFactures,stock,showToast}) {
     setTimeout(()=>document.body.removeChild(iframe),1000);
   };
 
-  const del=async(id)=>{await dbDel("factures",id);setFactures(factures.filter(f=>f.id!==id));if(preview?.id===id)setPreview(null);showToast("Supprimée");};
+  const del=async(id)=>{
+    // Supprimer la facture
+    await dbDel("factures",id);
+    setFactures(factures.filter(f=>f.id!==id));
+    if(preview?.id===id)setPreview(null);
+    showToast("Facture supprimée ✓");
+  };
 
   // Produits par catégorie
   const produitsByCat=(cat)=>stock.filter(p=>p.cat===cat);
@@ -974,7 +980,7 @@ function Factures({factures,setFactures,stock,showToast}) {
               <table style={{width:"100%",borderCollapse:"collapse",marginBottom:24}}>
                 <thead>
                   <tr style={{background:"#f5f5f7"}}>
-                    {["Description","Détails","Qté","Prix unit.","Total"].map(h=>(
+                    {["Description & Détails","Qté","Prix unit.","Total"].map(h=>(
                       <th key={h} style={{padding:"10px 12px",textAlign:"left",fontSize:12,fontWeight:700,color:"#636366",textTransform:"uppercase"}}>{h}</th>
                     ))}
                   </tr>
@@ -983,11 +989,21 @@ function Factures({factures,setFactures,stock,showToast}) {
                   {lignesParsed.map((l,i)=>{
                     const champs=CHAMPS_CAT[l.cat]||[];
                     const details=l.details||{};
-                    const detailStr=champs.filter(c=>details[c.key]).map(c=>`${c.label}: ${details[c.key]}`).join(" · ");
+                    const detailsList=champs.filter(c=>details[c.key]);
                     return (
                       <tr key={i} style={{borderBottom:"1px solid #e5e5ea"}}>
-                        <td style={{padding:"12px",fontSize:14,fontWeight:600}}>{l.desc}</td>
-                        <td style={{padding:"12px",fontSize:12,color:"#636366"}}>{detailStr||"—"}</td>
+                        <td style={{padding:"12px",fontSize:14,fontWeight:600}}>
+                          {l.desc}
+                          {detailsList.length>0&&(
+                            <div style={{marginTop:6}}>
+                              {detailsList.map(c=>(
+                                <div key={c.key} style={{fontSize:11,color:"#636366",marginBottom:2}}>
+                                  <strong>{c.label} :</strong> {details[c.key]}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
                         <td style={{padding:"12px",fontSize:14,textAlign:"center",color:"#636366"}}>{l.qte}</td>
                         <td style={{padding:"12px",fontSize:14,textAlign:"right",color:"#636366"}}>{xof(l.pu)}</td>
                         <td style={{padding:"12px",fontSize:14,textAlign:"right",fontWeight:700}}>{xof(l.qte*l.pu)}</td>
@@ -1046,19 +1062,30 @@ function Factures({factures,setFactures,stock,showToast}) {
 }
 
 // ─── Bénéfices ────────────────────────────────────────────────────────────────
-function Benefices({depenses,ventes,stock}) {
+function Benefices({depenses,ventes,stock,factures}) {
   const {theme}=useTheme();
   const [periode,setPeriode]=useState("all");
   const now=new Date();
   const fDate=d=>{if(periode==="all")return true;const dt=new Date(d);if(periode==="mois")return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();if(periode==="semaine")return(now-dt)<7*24*3600*1000;return true;};
-  const vF=ventes.filter(v=>fDate(v.date));
+  const fF=factures.filter(f=>fDate(f.date));
   const dF=depenses.filter(d=>d.statut==="Approuvée"&&fDate(d.date));
-  const CA=vF.reduce((s,v)=>s+v.prix_vente*v.qte,0);
+  const CA=fF.reduce((s,f)=>s+f.total,0);
   const cout=dF.reduce((s,d)=>s+d.montant,0);
   const ben=CA-cout;
   const marge=CA>0?Math.round((ben/CA)*100):0;
+  // Top produits depuis les lignes de factures
   const byProd={};
-  vF.forEach(v=>{if(!byProd[v.produit])byProd[v.produit]={produit:v.produit,qte:0,ca:0};byProd[v.produit].qte+=v.qte;byProd[v.produit].ca+=v.prix_vente*v.qte;});
+  fF.forEach(f=>{
+    try{
+      const lignes=typeof f.lignes==="string"?JSON.parse(f.lignes):f.lignes||[];
+      lignes.forEach(l=>{
+        if(!l.desc)return;
+        if(!byProd[l.desc])byProd[l.desc]={produit:l.desc,qte:0,ca:0};
+        byProd[l.desc].qte+=l.qte||1;
+        byProd[l.desc].ca+=(l.qte||1)*(l.pu||0);
+      });
+    }catch(e){}
+  });
   const top=Object.values(byProd).sort((a,b)=>b.ca-a.ca);
 
   return (
@@ -1114,8 +1141,56 @@ function Benefices({depenses,ventes,stock}) {
           </div>
         </Card>
       </div>
-      <Card>
-        <CardTitle>Historique des ventes</CardTitle>
+
+      {/* Bénéfice par produit */}
+      <Card style={{marginBottom:14}}>
+        <CardTitle>💰 Bénéfice par produit vendu</CardTitle>
+        {top.length===0
+          ?<div style={{color:theme.textMuted,fontSize:13}}>Aucune vente pour cette période</div>
+          :<div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead>
+                <tr>{["Produit","Qté vendue","CA","Coût achat","Bénéfice","Marge"].map(h=>(
+                  <th key={h} style={{padding:"10px 12px",textAlign:"left",fontSize:11,fontWeight:600,color:theme.textMuted,background:theme.tableHead,borderBottom:`1px solid ${theme.border}`}}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {top.map(p=>{
+                  const sp=stock.find(x=>x.nom===p.produit);
+                  const coutAchat=sp?sp.prix_achat*p.qte:0;
+                  const beneficeProduit=p.ca-coutAchat;
+                  const margeProduit=coutAchat>0?Math.round((beneficeProduit/coutAchat)*100):null;
+                  return (
+                    <tr key={p.produit} style={{borderBottom:`1px solid ${theme.borderLight}`}}>
+                      <td style={{padding:"11px 12px",fontSize:13,fontWeight:600,color:theme.text}}>{p.produit}</td>
+                      <td style={{padding:"11px 12px",fontSize:13,color:theme.textMuted,textAlign:"center"}}>{p.qte}</td>
+                      <td style={{padding:"11px 12px",fontSize:13,fontWeight:700,color:"#0A84FF"}}>{xof(p.ca)}</td>
+                      <td style={{padding:"11px 12px",fontSize:13,color:"#FF453A"}}>{coutAchat>0?xof(coutAchat):"—"}</td>
+                      <td style={{padding:"11px 12px",fontSize:13,fontWeight:800,color:beneficeProduit>=0?"#30D158":"#FF453A"}}>{xof(beneficeProduit)}</td>
+                      <td style={{padding:"11px 12px"}}>
+                        {margeProduit!==null
+                          ?<span style={{background:margeProduit>=0?"rgba(48,209,88,0.12)":"rgba(255,69,58,0.12)",color:margeProduit>=0?"#30D158":"#FF453A",padding:"3px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>
+                            {margeProduit>=0?"+":""}{margeProduit}%
+                          </span>
+                          :<span style={{color:theme.textMuted,fontSize:12}}>—</span>
+                        }
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr style={{borderTop:`2px solid ${theme.border}`,background:theme.tableHead}}>
+                  <td style={{padding:"11px 12px",fontSize:13,fontWeight:800,color:theme.text}}>TOTAL</td>
+                  <td style={{padding:"11px 12px",fontSize:13,color:theme.textMuted,textAlign:"center"}}>{top.reduce((s,p)=>s+p.qte,0)}</td>
+                  <td style={{padding:"11px 12px",fontSize:13,fontWeight:800,color:"#0A84FF"}}>{xof(CA)}</td>
+                  <td style={{padding:"11px 12px",fontSize:13,fontWeight:700,color:"#FF453A"}}>{xof(top.reduce((s,p)=>{const sp=stock.find(x=>x.nom===p.produit);return s+(sp?sp.prix_achat*p.qte:0);},0))}</td>
+                  <td style={{padding:"11px 12px",fontSize:14,fontWeight:900,color:ben>=0?"#30D158":"#FF453A"}}>{xof(ben)}</td>
+                  <td style={{padding:"11px 12px",fontSize:14,fontWeight:800,color:"#FF9F0A"}}>{marge}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        }
+      </Card>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>{["Produit","Client","Qté","Prix unit.","Total","Date"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
           <tbody>
@@ -1133,6 +1208,278 @@ function Benefices({depenses,ventes,stock}) {
           </tbody>
         </table>
       </Card>
+    </div>
+  );
+}
+
+// ─── Ventes ───────────────────────────────────────────────────────────────────
+function Ventes({ventes,setVentes,factures,catStk,showToast}) {
+  const {theme}=useTheme();
+  const [fCat,setFCat]=useState("all");
+  const [fPeriode,setFPeriode]=useState("all");
+  const now=new Date();
+
+  const fDate=(d)=>{
+    if(fPeriode==="all")return true;
+    const dt=new Date(d);
+    if(fPeriode==="mois")return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();
+    if(fPeriode==="semaine")return(now-dt)<7*24*3600*1000;
+    if(fPeriode==="jour")return dt.toDateString()===now.toDateString();
+    return true;
+  };
+
+  // Récupérer toutes les ventes depuis les factures
+  const ventesDepuisFactures=[];
+  factures.forEach(f=>{
+    try{
+      const lignes=typeof f.lignes==="string"?JSON.parse(f.lignes):f.lignes||[];
+      lignes.forEach((l,i)=>{
+        ventesDepuisFactures.push({
+          id:`${f.id}-${i}`,
+          produit:l.desc,
+          cat:l.cat||"",
+          qte:l.qte||1,
+          prix_vente:l.pu||0,
+          total:(l.qte||1)*(l.pu||0),
+          client:f.client||"—",
+          date:f.date,
+          factureNum:f.numero,
+          details:l.details||{},
+        });
+      });
+    }catch(e){}
+  });
+
+  const filtered=ventesDepuisFactures.filter(v=>{
+    const catOk=fCat==="all"||v.cat===fCat;
+    const dateOk=fDate(v.date);
+    return catOk&&dateOk;
+  });
+
+  const totalCA=filtered.reduce((s,v)=>s+v.total,0);
+  const totalQte=filtered.reduce((s,v)=>s+v.qte,0);
+
+  // Imprimer
+  const imprimer=()=>{
+    const iframe=document.createElement("iframe");
+    iframe.style.display="none";
+    document.body.appendChild(iframe);
+    let rows="";
+    filtered.forEach((v,i)=>{
+      rows+=`<tr><td>${i+1}</td><td><strong>${v.produit}</strong></td><td>${v.client}</td><td>${v.qte}</td><td>${xof(v.prix_vente)}</td><td><strong>${xof(v.total)}</strong></td><td>${v.date}</td><td>${v.factureNum||"—"}</td></tr>`;
+    });
+    iframe.contentDocument.write(`<html><head><title>Ventes — Angy Company</title><style>*{box-sizing:border-box;}body{font-family:Arial,sans-serif;padding:30px;color:#1C1C1E;}h1{font-size:18px;}table{width:100%;border-collapse:collapse;margin-top:14px;}th,td{border:1px solid #e5e5ea;padding:7px 10px;font-size:12px;text-align:left;}th{background:#f5f5f7;font-weight:700;}</style></head><body>
+    <h1>Angy Company — Registre des ventes</h1>
+    <p style="color:#636366;font-size:12px;">Total : ${xof(totalCA)} · ${filtered.length} vente(s) · ${totalQte} article(s)</p>
+    <table><thead><tr><th>#</th><th>Produit</th><th>Client</th><th>Qté</th><th>Prix unit.</th><th>Total</th><th>Date</th><th>Facture</th></tr></thead><tbody>${rows}</tbody></table>
+    <p style="margin-top:10px;font-weight:700;">Total CA : ${xof(totalCA)}</p>
+    </body></html>`);
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(()=>document.body.removeChild(iframe),1000);
+  };
+
+  const getCat=(id)=>catStk.find(c=>c.id===id)||{icon:"📦",label:id||"Autre",color:"#8E8E93"};
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>💸 Ventes</h1>
+        <button onClick={imprimer} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"8px 16px",borderRadius:10,cursor:"pointer",fontSize:13,fontFamily:"inherit",fontWeight:600}}>🖨️ Imprimer</button>
+      </div>
+
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+        <KPI label="Chiffre d'affaires" value={xof(totalCA)} accent="#30D158" icon="💰" sub={`${filtered.length} vente(s)`}/>
+        <KPI label="Articles vendus" value={totalQte} accent="#0A84FF" icon="📦" sub="Total quantités"/>
+        <KPI label="Panier moyen" value={filtered.length>0?xof(Math.round(totalCA/filtered.length)):"—"} accent="#FF9F0A" icon="🛒" sub="Par vente"/>
+      </div>
+
+      {/* Filtres */}
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        <select value={fCat} onChange={e=>setFCat(e.target.value)}
+          style={{background:theme.sel,border:`1px solid ${theme.border}`,borderRadius:9,padding:"8px 12px",color:theme.text,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+          <option value="all">Toutes catégories</option>
+          {catStk.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+        </select>
+        <select value={fPeriode} onChange={e=>setFPeriode(e.target.value)}
+          style={{background:theme.sel,border:`1px solid ${theme.border}`,borderRadius:9,padding:"8px 12px",color:theme.text,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+          <option value="all">Toute la période</option>
+          <option value="jour">Aujourd'hui</option>
+          <option value="semaine">Cette semaine</option>
+          <option value="mois">Ce mois</option>
+        </select>
+        <div style={{marginLeft:"auto",color:theme.textMuted,fontSize:13}}>
+          Total : <strong style={{color:"#30D158"}}>{xof(totalCA)}</strong> · {filtered.length} vente{filtered.length!==1?"s":""}
+        </div>
+      </div>
+
+      {/* Tableau */}
+      <div style={{background:theme.bgCard,borderRadius:16,border:`1px solid ${theme.border}`,overflow:"auto",boxShadow:theme.shadow}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead>
+            <tr>{["Produit","Catégorie","Client","Qté","Prix unit.","Total","Date","Facture"].map(h=>(
+              <th key={h} style={{padding:"11px 14px",textAlign:"left",fontSize:11,fontWeight:600,color:theme.textMuted,background:theme.tableHead,borderBottom:`1px solid ${theme.border}`,whiteSpace:"nowrap"}}>{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody>
+            {filtered.length===0&&<tr><td colSpan={8} style={{padding:"2rem",textAlign:"center",color:theme.textMuted}}>Aucune vente</td></tr>}
+            {filtered.map(v=>{
+              const cat=getCat(v.cat);
+              return (
+                <tr key={v.id}>
+                  <td style={{padding:"11px 14px",fontSize:13,color:theme.text}}><strong>{v.produit}</strong></td>
+                  <td style={{padding:"11px 14px"}}>
+                    <span style={{background:cat.color+"22",color:cat.color,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:600}}>{cat.icon} {cat.label}</span>
+                  </td>
+                  <td style={{padding:"11px 14px",fontSize:13,color:theme.textSub}}>{v.client}</td>
+                  <td style={{padding:"11px 14px",fontSize:13,color:theme.textMuted,textAlign:"center"}}>{v.qte}</td>
+                  <td style={{padding:"11px 14px",fontSize:13,color:theme.textMuted}}>{xof(v.prix_vente)}</td>
+                  <td style={{padding:"11px 14px",fontSize:13,fontWeight:700,color:"#30D158"}}>{xof(v.total)}</td>
+                  <td style={{padding:"11px 14px",fontSize:12,color:theme.textMuted}}>{v.date}</td>
+                  <td style={{padding:"11px 14px"}}><span style={{color:"#BF5AF2",fontSize:12,fontWeight:600}}>#{v.factureNum}</span></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Gestion Utilisateurs Angy ────────────────────────────────────────────────
+function AngyUtilisateurs({showToast}) {
+  const {theme}=useTheme();
+  const [users,setUsers]=useState(()=>loadAngyUsers());
+  const [show,setShow]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [form,setForm]=useState({nom:"",prenom:"",email:"",mot_de_passe:"",role:"vendeur",actif:true});
+
+  const ROLES=[
+    {v:"admin",    l:"👑 Administrateur — Accès total"},
+    {v:"vendeur",  l:"🛒 Vendeur — Stock et factures"},
+    {v:"comptable",l:"💰 Comptable — Dépenses et bénéfices"},
+  ];
+
+  const roleLabel=(r)=>r==="admin"?"👑 Admin":r==="vendeur"?"🛒 Vendeur":"💰 Comptable";
+  const roleColor=(r)=>r==="admin"?"#FF9F0A":r==="vendeur"?"#30D158":"#0A84FF";
+
+  const save=()=>{
+    if(!form.nom||!form.email||(!editId&&!form.mot_de_passe))return showToast("Tous les champs requis",true);
+    if(users.find(u=>u.email===form.email&&u.id!==editId))return showToast("Email déjà utilisé",true);
+    let updated;
+    if(editId){
+      updated=users.map(u=>u.id===editId?{...u,...form}:u);
+      showToast("Utilisateur modifié ✓");
+    } else {
+      const newUser={...form,id:Date.now()};
+      updated=[...users,newUser];
+      showToast("Utilisateur créé ✓");
+    }
+    saveAngyUsers(updated);
+    setUsers(updated);
+    setForm({nom:"",prenom:"",email:"",mot_de_passe:"",role:"vendeur",actif:true});
+    setEditId(null);setShow(false);
+  };
+
+  const startEdit=(u)=>{setForm({nom:u.nom,prenom:u.prenom||"",email:u.email,mot_de_passe:u.mot_de_passe,role:u.role,actif:u.actif});setEditId(u.id);setShow(true);};
+
+  const toggleActif=(id)=>{
+    const updated=users.map(u=>u.id===id?{...u,actif:!u.actif}:u);
+    saveAngyUsers(updated);setUsers(updated);
+    showToast("Statut mis à jour ✓");
+  };
+
+  const del=(id)=>{
+    if(users.filter(u=>u.role==="admin").length===1&&users.find(u=>u.id===id)?.role==="admin")
+      return showToast("Impossible de supprimer le dernier admin !",true);
+    const updated=users.filter(u=>u.id!==id);
+    saveAngyUsers(updated);setUsers(updated);showToast("Supprimé");
+  };
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>👥 Utilisateurs ({users.length})</h1>
+        <button onClick={()=>{setShow(!show);setEditId(null);setForm({nom:"",prenom:"",email:"",mot_de_passe:"",role:"vendeur",actif:true});}}
+          style={{background:"#0A84FF",color:"#fff",border:"none",padding:"9px 20px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+          {show?"✕ Annuler":"+ Nouvel utilisateur"}
+        </button>
+      </div>
+
+      {show&&(
+        <div style={{background:theme.bgCard,borderRadius:16,padding:"20px 22px",border:`1px solid ${theme.border}`,boxShadow:theme.shadow,marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:700,color:theme.text,marginBottom:14}}>{editId?"✏️ Modifier":"Nouvel utilisateur"}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Nom *</label>
+              <input value={form.nom} onChange={e=>setForm({...form,nom:e.target.value})} placeholder="Nom de famille"
+                style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"9px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Prénom</label>
+              <input value={form.prenom} onChange={e=>setForm({...form,prenom:e.target.value})} placeholder="Prénom"
+                style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"9px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Email *</label>
+              <input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="email@angy.com"
+                style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"9px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>{editId?"Nouveau mot de passe":"Mot de passe *"}</label>
+              <input type="password" value={form.mot_de_passe} onChange={e=>setForm({...form,mot_de_passe:e.target.value})} placeholder="••••••••"
+                style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"9px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted}}>Rôle</label>
+              <select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}
+                style={{background:theme.sel,border:`1px solid ${theme.inputBorder}`,borderRadius:9,padding:"9px 13px",color:theme.text,fontSize:14,outline:"none",fontFamily:"inherit",cursor:"pointer"}}>
+                {ROLES.map(r=><option key={r.v} value={r.v}>{r.l}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={save} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 22px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+              {editId?"💾 Sauvegarder":"Créer le compte"}
+            </button>
+            {editId&&<button onClick={()=>{setEditId(null);setShow(false);}} style={{background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,padding:"10px 18px",borderRadius:10,fontWeight:600,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>Annuler</button>}
+          </div>
+        </div>
+      )}
+
+      {/* Liste utilisateurs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
+        {users.map(u=>(
+          <div key={u.id} style={{background:theme.bgCard,borderRadius:16,padding:"18px 20px",border:`1px solid ${u.actif?theme.border:"rgba(255,69,58,0.2)"}`,boxShadow:theme.shadow,opacity:u.actif?1:0.7}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:42,height:42,borderRadius:12,background:roleColor(u.role)+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
+                  {u.role==="admin"?"👑":u.role==="vendeur"?"🛒":"💰"}
+                </div>
+                <div>
+                  <div style={{fontSize:15,fontWeight:800,color:theme.text}}>{u.prenom} {u.nom}</div>
+                  <div style={{fontSize:12,color:theme.textMuted}}>{u.email}</div>
+                </div>
+              </div>
+              <span style={{background:roleColor(u.role)+"22",color:roleColor(u.role),padding:"3px 10px",borderRadius:99,fontSize:11,fontWeight:700}}>{roleLabel(u.role)}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderTop:`1px solid ${theme.borderLight}`,marginBottom:10}}>
+              <span style={{fontSize:12,color:theme.textMuted}}>Statut</span>
+              <span style={{background:u.actif?"#1C3A27":"#3A1C1C",color:u.actif?"#30D158":"#FF453A",padding:"2px 10px",borderRadius:99,fontSize:11,fontWeight:700}}>{u.actif?"✓ Actif":"✕ Inactif"}</span>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>startEdit(u)} style={{flex:1,background:"rgba(255,159,10,0.12)",border:"1px solid #FF9F0A",color:"#FF9F0A",padding:"7px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>✏️ Modifier</button>
+              <button onClick={()=>toggleActif(u.id)} style={{flex:1,background:u.actif?"rgba(255,69,58,0.12)":"rgba(48,209,88,0.12)",border:`1px solid ${u.actif?"#FF453A":"#30D158"}`,color:u.actif?"#FF453A":"#30D158",padding:"7px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>
+                {u.actif?"🔒 Désactiver":"🔓 Activer"}
+              </button>
+              <button onClick={()=>del(u.id)} style={{background:"none",border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"7px 10px",borderRadius:8,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🗑</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1282,9 +1629,11 @@ export default function App() {
     {id:"dashboard",  label:"Dashboard",   icon:"◈"},
     ...(isAdmin||isComptable?[{id:"depenses",label:"Dépenses",icon:"📤"}]:[]),
     ...(isAdmin||isVendeur?[{id:"stock",label:"Stock",icon:"📦",badge:alertes}]:[]),
+    ...(isAdmin||isVendeur?[{id:"ventes",label:"Ventes",icon:"💸"}]:[]),
     ...(isAdmin||isVendeur||isComptable?[{id:"factures",label:"Factures",icon:"🧾"}]:[]),
     ...(isAdmin||isComptable?[{id:"benefices",label:"Bénéfices",icon:"📈"}]:[]),
     ...(isAdmin?[{id:"categories",label:"Catégories",icon:"🏷️"}]:[]),
+    ...(isAdmin?[{id:"utilisateurs",label:"Utilisateurs",icon:"👥"}]:[]),
   ];
 
   return (
@@ -1326,9 +1675,11 @@ export default function App() {
               {page==="dashboard"  &&<Dashboard   depenses={depenses} stock={stock} ventes={ventes} factures={factures}/>}
               {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} stock={stock} setStock={setStock} showToast={showToast}/>}
               {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} depenses={depenses} setDepenses={setDepenses} catStk={catStk} showToast={showToast} setPage={setPage}/>}
+              {page==="ventes"     &&<Ventes      ventes={ventes} setVentes={setVentes} factures={factures} catStk={catStk} showToast={showToast}/>}
               {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast}/>}
-              {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock}/>}
+              {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock} factures={factures}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
+              {page==="utilisateurs"&&<AngyUtilisateurs showToast={showToast}/>}
             </>
           )}
         </main>
