@@ -152,6 +152,41 @@ const today = () => new Date().toISOString().split("T")[0];
 const getCat = (list,id) => list.find(c=>c.id===id)||list[list.length-1];
 const stStyle = (s,theme) => s==="Approuvée"?theme.badgeApp:s==="Rejetée"?theme.badgeRej:theme.badgePend;
 
+// ─── Export utilitaires ───────────────────────────────────────────────────────
+const exportCSV = (data, filename) => {
+  if(!data||data.length===0)return;
+  const headers=Object.keys(data[0]);
+  const rows=data.map(row=>headers.map(h=>{
+    const val=row[h]===null||row[h]===undefined?"":String(row[h]);
+    return val.includes(",")?"\""+val+"\"":val;
+  }).join(","));
+  const csv=[headers.join(","),...rows].join("\n");
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename+".csv";
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+};
+
+const exportExcel = (data, filename, sheetName="Données") => {
+  if(!data||data.length===0)return;
+  const headers=Object.keys(data[0]);
+  // Créer XML Excel (format XLSX simplifié via CSV avec extension xlsx)
+  // On utilise le format CSV avec BOM pour compatibilité Excel
+  const rows=data.map(row=>headers.map(h=>{
+    const val=row[h]===null||row[h]===undefined?"":String(row[h]);
+    return `"${val.replace(/"/g,'""')}"`;
+  }).join("\t"));
+  const tsv=[headers.join("\t"),...rows].join("\n");
+  const blob=new Blob(["\uFEFF"+tsv],{type:"application/vnd.ms-excel;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename+".xls";
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+};
+
 // ─── UI Components ────────────────────────────────────────────────────────────
 const Badge = ({s}) => {
   const {theme}=useTheme();
@@ -588,8 +623,12 @@ function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast}) {
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>Dépenses</h1>
-        <BtnPri onClick={()=>{setShow(!show);setEditId(null);}}>{show?"✕ Annuler":"+ Nouvelle dépense"}</BtnPri>
+        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>Dépenses ({depenses.length})</h1>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>exportExcel(depenses.map(d=>({Titre:d.titre,Catégorie:d.categorie||d.cat,Montant:d.montant,Date:d.date,Statut:d.statut,Note:d.note||""})),"depenses-angy")}
+            style={{background:theme.toggleBg,border:`1px solid #30D158`,color:"#30D158",padding:"8px 14px",borderRadius:10,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>📊 Excel</button>
+          <BtnPri onClick={()=>{setShow(!show);setEditId(null);}}>{show?"✕ Annuler":"+ Nouvelle dépense"}</BtnPri>
+        </div>
       </div>
       {show&&(
         <Card style={{marginBottom:16}}>
@@ -768,8 +807,12 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>Stock</h1>
-        <BtnPri onClick={()=>setShowAdd(!showAdd)}>{showAdd?"✕ Annuler":"+ Ajouter produit"}</BtnPri>
+        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>Stock ({stock.length})</h1>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>exportExcel(stock.map(p=>({Nom:p.nom,Catégorie:p.cat,Quantité:p.qte,"Prix achat":p.prix_achat,"Prix vente":p.prix_vente,"Seuil alerte":p.seuil,"Valeur stock":p.prix_achat*p.qte})),"stock-angy")}
+            style={{background:theme.toggleBg,border:`1px solid #30D158`,color:"#30D158",padding:"8px 14px",borderRadius:10,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>📊 Excel</button>
+          <BtnPri onClick={()=>setShowAdd(!showAdd)}>{showAdd?"✕ Annuler":"+ Ajouter produit"}</BtnPri>
+        </div>
       </div>
       {showAdd&&(
         <Card style={{marginBottom:16}}>
@@ -1024,6 +1067,8 @@ function Factures({factures,setFactures,stock,showToast}) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>Factures</h1>
         <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>exportExcel(factures.map(f=>({Numéro:f.numero,Client:f.client,Téléphone:f.telephone||"",Date:f.date,Paiement:f.paiement||"Espèces",Total:f.total})),"factures-angy")}
+            style={{background:theme.toggleBg,border:`1px solid #30D158`,color:"#30D158",padding:"8px 14px",borderRadius:10,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>📊 Excel</button>
           {preview&&<BtnSec onClick={imprimer}>🖨️ Imprimer</BtnSec>}
           <BtnPri onClick={()=>{setShow(!show);setPreview(null);}}>{show?"✕ Annuler":"+ Nouvelle facture"}</BtnPri>
         </div>
@@ -1609,8 +1654,10 @@ function Clients({clients,setClients,factures,showToast}) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>👥 Clients ({clients.length})</h1>
         <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>exportExcel(clients.map(c=>({Nom:c.nom,Téléphone:c.telephone||"",Email:c.email||"",Adresse:c.adresse||"",Type:c.type||"Particulier","Total achats":getTotalAchats(c.nom),"Nb achats":getAchats(c.nom).length})),"clients-angy")}
+            style={{background:theme.toggleBg,border:`1px solid #30D158`,color:"#30D158",padding:"8px 14px",borderRadius:10,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600}}>📊 Excel</button>
           <button onClick={imprimer} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"8px 16px",borderRadius:10,cursor:"pointer",fontSize:13,fontFamily:"inherit",fontWeight:600}}>🖨️ Imprimer</button>
-          <button onClick={()=>{setShow(!show);setEditId(null);setForm({nom:"",telephone:"",email:"",adresse:"",type:"Particulier",note:""}); setSelected(null);}}
+          <button onClick={()=>{setShow(!show);setEditId(null);setForm({nom:"",telephone:"",email:"",adresse:"",type:"Particulier",note:""});setSelected(null);}}
             style={{background:"#0A84FF",color:"#fff",border:"none",padding:"9px 20px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
             {show?"✕ Annuler":"+ Nouveau client"}
           </button>
