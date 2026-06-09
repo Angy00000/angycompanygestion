@@ -693,7 +693,7 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
   const [showAdd,setShowAdd]=useState(false);
   const [showVente,setShowVente]=useState(null);
   const [form,setForm]=useState({nom:"",cat:catStk[0]?.id||"iphones",qte:"",prix_achat:"",prix_vente:"",seuil:""});
-  const [vf,setVf]=useState({qte:"",client:"",telephone:"",date:today(),creerFacture:true});
+  const [vf,setVf]=useState({qte:"",client:"",telephone:"",date:today(),creerFacture:true,paiement:"Espèces"});
   const [fCat,setFCat]=useState("all");
   const [loading,setLoading]=useState(false);
   const [editId,setEditId]=useState(null);
@@ -749,14 +749,14 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
       if(vf.creerFacture){
         const numero=`FAC-${new Date().getFullYear()}-${String(factures.length+1).padStart(3,"0")}`;
         const lignes=JSON.stringify([{desc:p.nom,cat:p.cat,qte:q,pu:p.prix_vente,details:{}}]);
-        const factRows=await dbAdd("factures",{numero,client:vf.client||"—",email:"",telephone:vf.telephone||"",adresse:"",date:vf.date,note:"Merci pour votre confiance",lignes,total:q*p.prix_vente});
+        const factRows=await dbAdd("factures",{numero,client:vf.client||"—",email:"",telephone:vf.telephone||"",adresse:"",date:vf.date,note:"Merci pour votre confiance",lignes,total:q*p.prix_vente,paiement:vf.paiement||"Espèces"});
         setFactures([factRows[0],...factures]);
         showToast("Vente + Facture créées ✓ — Allez dans 🧾 Factures");
       } else {
         showToast("Vente enregistrée ✓");
       }
 
-      setVf({qte:"",client:"",telephone:"",date:today(),creerFacture:true});
+      setVf({qte:"",client:"",telephone:"",date:today(),creerFacture:true,paiement:"Espèces"});
       setShowVente(null);
     }catch(e){showToast("Erreur",true);}
     setLoading(false);
@@ -818,6 +818,28 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
               <Inp label="Téléphone client" value={vf.telephone} onChange={e=>setVf({...vf,telephone:e.target.value})} placeholder="+221 77 000 00 00"/>
               <Inp label="Date" type="date" value={vf.date} onChange={e=>setVf({...vf,date:e.target.value})}/>
             </div>
+            {/* Mode de paiement */}
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:12,fontWeight:600,color:theme.textMuted,display:"block",marginBottom:8}}>Mode de paiement</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                {[
+                  {v:"Espèces",    icon:"💵", color:"#30D158"},
+                  {v:"Wave",       icon:"📱", color:"#00B9F1"},
+                  {v:"Orange Money",icon:"🟠",color:"#FF6600"},
+                  {v:"Free Money", icon:"🔵", color:"#0066FF"},
+                  {v:"Virement",   icon:"🏦", color:"#BF5AF2"},
+                  {v:"Crédit",     icon:"🔄", color:"#FF453A"},
+                ].map(m=>(
+                  <button key={m.v} onClick={()=>setVf({...vf,paiement:m.v})}
+                    style={{padding:"7px 14px",borderRadius:10,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",
+                      borderColor:vf.paiement===m.v?m.color:theme.border,
+                      background:vf.paiement===m.v?m.color+"22":"transparent",
+                      color:vf.paiement===m.v?m.color:theme.textMuted}}>
+                    {m.icon} {m.v}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div style={{fontSize:13,color:theme.textMuted,marginBottom:12}}>
               Prix unitaire : <strong style={{color:"#30D158"}}>{xof(p.prix_vente)}</strong>
               {vf.qte&&<> — Total : <strong style={{color:"#30D158"}}>{xof(parseInt(vf.qte||0)*p.prix_vente)}</strong></>}
@@ -835,7 +857,7 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
             </div>
             <div style={{display:"flex",gap:10}}>
               <BtnPri onClick={vendre} style={{opacity:loading?0.6:1}}>{loading?"...":`${vf.creerFacture?"Vendre + Facturer":"Confirmer la vente"}`}</BtnPri>
-              <BtnSec onClick={()=>{setShowVente(null);setVf({qte:"",client:"",telephone:"",date:today(),creerFacture:true});}}>Annuler</BtnSec>
+              <BtnSec onClick={()=>{setShowVente(null);setVf({qte:"",client:"",telephone:"",date:today(),creerFacture:true,paiement:"Espèces"});}}>Annuler</BtnSec>
             </div>
           </Card>
         ):null;
@@ -954,7 +976,7 @@ function Factures({factures,setFactures,stock,showToast}) {
     setLoading(true);
     try{
       const numero=numFacture();
-      const data={numero,client:form.client,email:form.email,telephone:form.telephone,adresse:form.adresse,date:form.date,note:form.note,lignes:JSON.stringify(lignes),total:totalLignes};
+      const data={numero,client:form.client,email:form.email,telephone:form.telephone,adresse:form.adresse,date:form.date,note:form.note,lignes:JSON.stringify(lignes),total:totalLignes,paiement:form.paiement||"Espèces"};
       const rows=await dbAdd("factures",data);
       setFactures([rows[0],...factures]);
       setPreview(rows[0]);
@@ -1018,6 +1040,29 @@ function Factures({factures,setFactures,stock,showToast}) {
             <Inp label="Adresse" value={form.adresse} onChange={e=>setForm({...form,adresse:e.target.value})} placeholder="Dakar, Sénégal"/>
             <Inp label="Date" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
             <Inp label="Note" value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="Merci pour votre confiance"/>
+          </div>
+
+          {/* Mode de paiement */}
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:12,fontWeight:600,color:theme.textMuted,display:"block",marginBottom:8}}>Mode de paiement</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {[
+                {v:"Espèces",     icon:"💵",color:"#30D158"},
+                {v:"Wave",        icon:"📱",color:"#00B9F1"},
+                {v:"Orange Money",icon:"🟠",color:"#FF6600"},
+                {v:"Free Money",  icon:"🔵",color:"#0066FF"},
+                {v:"Virement",    icon:"🏦",color:"#BF5AF2"},
+                {v:"Crédit",      icon:"🔄",color:"#FF453A"},
+              ].map(m=>(
+                <button key={m.v} onClick={()=>setForm({...form,paiement:m.v})}
+                  style={{padding:"7px 14px",borderRadius:10,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",
+                    borderColor:form.paiement===m.v?m.color:theme.border,
+                    background:form.paiement===m.v?m.color+"22":"transparent",
+                    color:form.paiement===m.v?m.color:theme.textMuted}}>
+                  {m.icon} {m.v}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Lignes articles */}
@@ -1170,8 +1215,14 @@ function Factures({factures,setFactures,stock,showToast}) {
                 </tbody>
               </table>
 
-              {/* Total */}
-              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:24}}>
+              {/* Total + Paiement */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:24}}>
+                <div style={{background:"#f5f5f7",borderRadius:12,padding:"12px 20px"}}>
+                  <div style={{fontSize:12,color:"#636366",marginBottom:4}}>Mode de paiement</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#1C1C1E"}}>
+                    {preview.paiement==="Wave"?"📱":preview.paiement==="Orange Money"?"🟠":preview.paiement==="Free Money"?"🔵":preview.paiement==="Virement"?"🏦":preview.paiement==="Crédit"?"🔄":"💵"} {preview.paiement||"Espèces"}
+                  </div>
+                </div>
                 <div style={{background:"#f5f5f7",borderRadius:12,padding:"16px 24px",textAlign:"right"}}>
                   <div style={{fontSize:13,color:"#636366",marginBottom:4}}>Total TTC</div>
                   <div style={{fontSize:28,fontWeight:900,color:"#0A84FF"}}>{xof(preview.total)}</div>
@@ -1194,14 +1245,17 @@ function Factures({factures,setFactures,stock,showToast}) {
       {/* Liste factures */}
       <TableWrap>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead><tr>{["Numéro","Client","Date","Total","Actions"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+          <thead><tr>{["Numéro","Client","Date","Paiement","Total","Actions"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
           <tbody>
-            {factures.length===0&&<tr><Td colSpan={5} style={{textAlign:"center",color:theme.textMuted,padding:"2rem"}}>Aucune facture</Td></tr>}
-            {factures.map(f=>(
+            {factures.length===0&&<tr><Td colSpan={6} style={{textAlign:"center",color:theme.textMuted,padding:"2rem"}}>Aucune facture</Td></tr>}
+            {factures.map(f=>{
+              const pColor=f.paiement==="Wave"?"#00B9F1":f.paiement==="Orange Money"?"#FF6600":f.paiement==="Free Money"?"#0066FF":f.paiement==="Virement"?"#BF5AF2":f.paiement==="Crédit"?"#FF453A":"#30D158";
+              return (
               <tr key={f.id}>
                 <Td><strong style={{color:"#BF5AF2"}}>#{f.numero}</strong></Td>
                 <Td style={{color:theme.text,fontWeight:600}}>{f.client}</Td>
                 <Td style={{color:theme.textMuted,fontSize:13}}>{f.date}</Td>
+                <Td><span style={{background:pColor+"22",color:pColor,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:600}}>{f.paiement||"Espèces"}</span></Td>
                 <Td style={{fontWeight:700,color:"#0A84FF"}}>{xof(f.total)}</Td>
                 <Td>
                   <div style={{display:"flex",gap:6}}>
@@ -1210,7 +1264,8 @@ function Factures({factures,setFactures,stock,showToast}) {
                   </div>
                 </Td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </TableWrap>
