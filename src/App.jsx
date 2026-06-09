@@ -1661,7 +1661,16 @@ function AngyLogin({onLogin}) {
       } else {
         setErreur("Email ou mot de passe incorrect");
       }
-    }catch(e){setErreur("Erreur de connexion");}
+    }catch(e){
+      // Hors ligne → vérifier dans le cache local
+      const cached=loadAngySession();
+      if(cached&&cached.email===email&&cached.mot_de_passe===mdp&&cached.actif){
+        onLogin(cached);
+        window.location.reload();
+      } else {
+        setErreur("Hors ligne — impossible de vérifier. Reconnectez-vous d'abord avec connexion.");
+      }
+    }
     setLoading(false);
   };
 
@@ -1758,6 +1767,15 @@ export default function App() {
   const isComptable=user?.role==="comptable";
 
   useEffect(()=>{
+    // Charger le cache immédiatement pour affichage rapide
+    const cache=loadAngyCache();
+    if(cache){
+      setDepenses(cache.depenses||[]);
+      setStock(cache.stock||[]);
+      setVentes(cache.ventes||[]);
+      setFactures(cache.factures||[]);
+    }
+    // Puis essayer Supabase
     (async()=>{
       try{
         const [d,s,v,f]=await Promise.all([
@@ -1770,14 +1788,6 @@ export default function App() {
         saveAngyCache(data);
         setOffline(false);
       }catch(e){
-        // Pas de connexion → charger depuis le cache
-        const cache=loadAngyCache();
-        if(cache){
-          setDepenses(cache.depenses||[]);
-          setStock(cache.stock||[]);
-          setVentes(cache.ventes||[]);
-          setFactures(cache.factures||[]);
-        }
         setOffline(true);
       }
       setLoading(false);
