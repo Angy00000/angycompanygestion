@@ -1649,6 +1649,257 @@ function Ventes({ventes,setVentes,factures,catStk,showToast}) {
   );
 }
 
+// ─── Devis ────────────────────────────────────────────────────────────────────
+function Devis({devis,setDevis,factures,setFactures,stock,clients,showToast}) {
+  const {theme}=useTheme();
+  const [show,setShow]=useState(false);
+  const [preview,setPreview]=useState(null);
+  const printRef=useRef();
+  const [lignes,setLignes]=useState([{desc:"",cat:"iphones",qte:1,pu:0}]);
+  const [form,setForm]=useState({client:"",telephone:"",email:"",adresse:"",date:today(),validite:"",note:"Devis valable 30 jours",paiement:"Espèces"});
+
+  const totalLignes=lignes.reduce((s,l)=>s+l.qte*l.pu,0);
+  const numDevis=()=>`DEV-${new Date().getFullYear()}-${String(devis.length+1).padStart(3,"0")}`;
+
+  const addLigne=()=>setLignes([...lignes,{desc:"",cat:"iphones",qte:1,pu:0}]);
+  const updLigne=(i,field,val)=>setLignes(lignes.map((l,idx)=>{
+    if(idx!==i)return l;
+    if(field==="produit"){const p=stock.find(x=>x.nom===val);return {...l,desc:val,pu:p?p.prix_vente:l.pu};}
+    if(field==="qte"||field==="pu")return {...l,[field]:Number(val)};
+    return {...l,[field]:val};
+  }));
+  const delLigne=i=>setLignes(lignes.filter((_,idx)=>idx!==i));
+
+  const creerDevis=async()=>{
+    if(!form.client||lignes.some(l=>!l.desc))return showToast("Client et descriptions requis",true);
+    const numero=numDevis();
+    const rows=await dbAdd("devis",{numero,client:form.client,telephone:form.telephone,email:form.email,adresse:form.adresse,date:form.date,validite:form.validite,lignes:JSON.stringify(lignes),total:totalLignes,statut:"En attente",note:form.note,paiement:form.paiement});
+    setDevis([rows[0],...devis]);
+    setLignes([{desc:"",cat:"iphones",qte:1,pu:0}]);
+    setForm({client:"",telephone:"",email:"",adresse:"",date:today(),validite:"",note:"Devis valable 30 jours",paiement:"Espèces"});
+    setShow(false);showToast("Devis créé ✓");
+  };
+
+  // Convertir devis en facture
+  const convertirEnFacture=async(d)=>{
+    const numero=`FAC-${new Date().getFullYear()}-${String(factures.length+1).padStart(3,"0")}`;
+    const rows=await dbAdd("factures",{numero,client:d.client,telephone:d.telephone||"",email:d.email||"",adresse:d.adresse||"",date:today(),note:d.note||"Merci pour votre confiance",lignes:d.lignes,total:d.total,paiement:d.paiement||"Espèces"});
+    setFactures([rows[0],...factures]);
+    await dbPatch("devis",d.id,{statut:"Accepté"});
+    setDevis(devis.map(x=>x.id===d.id?{...x,statut:"Accepté"}:x));
+    setPreview(null);
+    showToast(`Devis converti en facture ${numero} ✓`);
+  };
+
+  const del=async(id)=>{await dbDel("devis",id);setDevis(devis.filter(d=>d.id!==id));showToast("Supprimé");};
+
+  const imprimer=()=>{
+    if(!preview)return;
+    const lignesParsed=typeof preview.lignes==="string"?JSON.parse(preview.lignes):preview.lignes||[];
+    const iframe=document.createElement("iframe");
+    iframe.style.display="none";
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(`<html><head><title>Devis ${preview.numero}</title><style>
+      *{box-sizing:border-box;}body{font-family:Arial,sans-serif;margin:0;padding:40px;color:#1C1C1E;}
+      table{width:100%;border-collapse:collapse;}th{background:#f5f5f7;padding:10px;text-align:left;font-size:12px;font-weight:700;}
+      td{padding:10px;border-bottom:1px solid #e5e5ea;font-size:13px;}
+    </style></head><body>
+    <div style="display:flex;justify-content:space-between;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #1400FF;">
+      <div><strong style="font-size:22px;color:#1400FF;">ANGY COMPANY</strong><br/><small style="color:#636366;">📍 Parcelles Assainies U18, Dakar · 📞 +221 71 053 89 17</small></div>
+      <div style="text-align:right;"><strong style="font-size:18px;">DEVIS</strong><br/><strong style="color:#BF5AF2;">${preview.numero}</strong><br/><small>${preview.date}</small>${preview.validite?`<br/><small>Valide jusqu'au : ${preview.validite}</small>`:""}</div>
+    </div>
+    <div style="background:#f5f5f7;padding:14px;border-radius:10px;margin-bottom:24px;">
+      <strong>${preview.client}</strong>${preview.telephone?`<br/>${preview.telephone}`:""}${preview.adresse?`<br/>${preview.adresse}`:""}
+    </div>
+    <table><thead><tr><th>Description</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead><tbody>
+    ${lignesParsed.map(l=>`<tr><td><strong>${l.desc}</strong></td><td>${l.qte}</td><td>${xof(l.pu)}</td><td><strong>${xof(l.qte*l.pu)}</strong></td></tr>`).join("")}
+    </tbody></table>
+    <div style="text-align:right;margin-top:20px;"><strong style="font-size:22px;color:#0A84FF;">Total : ${xof(preview.total)}</strong></div>
+    ${preview.note?`<div style="margin-top:20px;padding:12px;border:1px solid #e5e5ea;border-radius:8px;font-size:12px;color:#636366;">${preview.note}</div>`:""}
+    <div style="margin-top:30px;text-align:center;font-size:11px;color:#8E8E93;border-top:1px solid #e5e5ea;padding-top:12px;">Angy Company · Parcelles Assainies U18, Dakar · +221 71 053 89 17</div>
+    </body></html>`);
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(()=>document.body.removeChild(iframe),1000);
+  };
+
+  const produitsByCat=(cat)=>stock.filter(p=>p.cat===cat);
+  const statutColor=(s)=>s==="Accepté"?"#30D158":s==="Refusé"?"#FF453A":"#FF9F0A";
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontWeight:800,fontSize:26,letterSpacing:"-0.5px",margin:0,color:theme.text}}>📋 Devis ({devis.length})</h1>
+        <BtnPri onClick={()=>{setShow(!show);setPreview(null);}}>{show?"✕ Annuler":"+ Nouveau devis"}</BtnPri>
+      </div>
+
+      {/* Formulaire */}
+      {show&&(
+        <Card style={{marginBottom:20}}>
+          <div style={{fontSize:15,fontWeight:700,color:theme.text,marginBottom:16}}>Nouveau devis — {numDevis()}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+            <Inp label="Nom du client *" value={form.client} onChange={e=>setForm({...form,client:e.target.value})} placeholder="Ex: Moussa Diallo"/>
+            <Inp label="Téléphone" value={form.telephone} onChange={e=>setForm({...form,telephone:e.target.value})} placeholder="+221 77 000 00 00"/>
+            <Inp label="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="client@email.com"/>
+            <Inp label="Adresse" value={form.adresse} onChange={e=>setForm({...form,adresse:e.target.value})} placeholder="Dakar, Sénégal"/>
+            <Inp label="Date" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
+            <Inp label="Valide jusqu'au" type="date" value={form.validite} onChange={e=>setForm({...form,validite:e.target.value})}/>
+            <Inp label="Note" value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="Devis valable 30 jours"/>
+          </div>
+
+          {/* Articles */}
+          <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:12}}>Articles</div>
+          {lignes.map((l,i)=>(
+            <div key={i} style={{background:theme.bg,borderRadius:12,padding:14,marginBottom:10,border:`1px solid ${theme.border}`}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px 100px auto",gap:8,alignItems:"end"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Catégorie</label>
+                  <select value={l.cat} onChange={e=>updLigne(i,"cat",e.target.value)}
+                    style={{background:theme.sel,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",cursor:"pointer"}}>
+                    {CATS_FACTURE.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                  </select>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Produit</label>
+                  {produitsByCat(l.cat).length>0?(
+                    <select value={l.desc} onChange={e=>updLigne(i,"produit",e.target.value)}
+                      style={{background:theme.sel,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",cursor:"pointer"}}>
+                      <option value="">-- Choisir --</option>
+                      {produitsByCat(l.cat).map(p=><option key={p.id} value={p.nom}>{p.nom} ({xof(p.prix_vente)})</option>)}
+                    </select>
+                  ):(
+                    <input value={l.desc} onChange={e=>updLigne(i,"desc",e.target.value)} placeholder="Description"
+                      style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                  )}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Qté</label>
+                  <input type="number" value={l.qte} onChange={e=>updLigne(i,"qte",e.target.value)} min="1"
+                    style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <label style={{fontSize:11,fontWeight:600,color:theme.textMuted}}>Prix unit.</label>
+                  <input type="number" value={l.pu} onChange={e=>updLigne(i,"pu",e.target.value)}
+                    style={{background:theme.input,border:`1px solid ${theme.inputBorder}`,borderRadius:8,padding:"8px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                </div>
+                <button onClick={()=>delLigne(i)} style={{background:"none",border:`1px solid ${theme.border}`,color:"#FF453A",padding:"8px",borderRadius:8,cursor:"pointer",fontSize:14,alignSelf:"flex-end"}}>✕</button>
+              </div>
+            </div>
+          ))}
+          <button onClick={addLigne} style={{background:"none",border:`1px dashed ${theme.border}`,color:theme.textMuted,padding:"10px 16px",borderRadius:10,cursor:"pointer",fontSize:13,fontFamily:"inherit",width:"100%",marginBottom:16}}>+ Ajouter un article</button>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontSize:20,fontWeight:800,color:"#0A84FF"}}>Total : {xof(totalLignes)}</div>
+            <BtnPri onClick={creerDevis}>Créer le devis</BtnPri>
+          </div>
+        </Card>
+      )}
+
+      {/* Aperçu devis */}
+      {preview&&(()=>{
+        const lignesParsed=typeof preview.lignes==="string"?JSON.parse(preview.lignes):preview.lignes||[];
+        return (
+          <Card style={{marginBottom:20,border:"1px solid rgba(191,90,242,0.3)"}}>
+            <div style={{display:"flex",gap:10,marginBottom:16}}>
+              <button onClick={imprimer} style={{background:"#BF5AF2",color:"#fff",border:"none",padding:"9px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>🖨️ Imprimer</button>
+              {preview.statut==="En attente"&&(
+                <>
+                  <button onClick={()=>convertirEnFacture(preview)}
+                    style={{background:"#30D158",color:"#fff",border:"none",padding:"9px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+                    ✅ Convertir en facture
+                  </button>
+                  <button onClick={async()=>{await dbPatch("devis",preview.id,{statut:"Refusé"});setDevis(devis.map(x=>x.id===preview.id?{...x,statut:"Refusé"}:x));setPreview(null);showToast("Devis refusé");}}
+                    style={{background:"rgba(255,69,58,0.12)",color:"#FF453A",border:"1px solid #FF453A",padding:"9px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+                    ✕ Refuser
+                  </button>
+                </>
+              )}
+              <BtnSec onClick={()=>setPreview(null)}>Fermer</BtnSec>
+            </div>
+            {/* Contenu devis */}
+            <div ref={printRef} style={{background:"#fff",color:"#1C1C1E",padding:"40px",borderRadius:12,fontFamily:"Arial,sans-serif"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32,paddingBottom:24,borderBottom:"3px solid #1400FF"}}>
+                <div>
+                  <AngyLogo height={40} forPrint={true}/>
+                  <div style={{marginTop:8,fontSize:12,color:"#636366"}}>📍 Parcelles Assainies U18, Dakar<br/>📞 +221 71 053 89 17</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:11,color:"#636366",textTransform:"uppercase",letterSpacing:"0.1em"}}>Devis</div>
+                  <div style={{fontSize:22,fontWeight:900,color:"#BF5AF2"}}>{preview.numero}</div>
+                  <div style={{fontSize:13,color:"#636366"}}>Date : {preview.date}</div>
+                  {preview.validite&&<div style={{fontSize:12,color:"#FF9F0A",fontWeight:600}}>Valide jusqu'au : {preview.validite}</div>}
+                  <div style={{marginTop:6}}><span style={{background:statutColor(preview.statut)+"22",color:statutColor(preview.statut),padding:"3px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>{preview.statut}</span></div>
+                </div>
+              </div>
+              <div style={{background:"#f5f5f7",borderRadius:10,padding:"14px 18px",marginBottom:24}}>
+                <div style={{fontSize:11,color:"#636366",marginBottom:4,textTransform:"uppercase"}}>Destinataire</div>
+                <div style={{fontSize:16,fontWeight:700}}>{preview.client}</div>
+                {preview.telephone&&<div style={{fontSize:13,color:"#636366"}}>{preview.telephone}</div>}
+                {preview.adresse&&<div style={{fontSize:13,color:"#636366"}}>{preview.adresse}</div>}
+              </div>
+              <table style={{width:"100%",borderCollapse:"collapse",marginBottom:24}}>
+                <thead>
+                  <tr style={{background:"#f5f5f7"}}>
+                    {["Description","Qté","Prix unit.","Total"].map(h=>(
+                      <th key={h} style={{padding:"10px 12px",textAlign:"left",fontSize:12,fontWeight:700,color:"#636366",textTransform:"uppercase"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lignesParsed.map((l,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid #e5e5ea"}}>
+                      <td style={{padding:"12px",fontSize:14,fontWeight:600}}>{l.desc}</td>
+                      <td style={{padding:"12px",fontSize:14,textAlign:"center",color:"#636366"}}>{l.qte}</td>
+                      <td style={{padding:"12px",fontSize:14,textAlign:"right",color:"#636366"}}>{xof(l.pu)}</td>
+                      <td style={{padding:"12px",fontSize:14,textAlign:"right",fontWeight:700}}>{xof(l.qte*l.pu)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:24}}>
+                <div style={{background:"#f5f5f7",borderRadius:12,padding:"16px 24px",textAlign:"right"}}>
+                  <div style={{fontSize:13,color:"#636366",marginBottom:4}}>Total TTC</div>
+                  <div style={{fontSize:28,fontWeight:900,color:"#0A84FF"}}>{xof(preview.total)}</div>
+                </div>
+              </div>
+              {preview.note&&<div style={{borderTop:"1px solid #e5e5ea",paddingTop:16,fontSize:13,color:"#636366",fontStyle:"italic"}}>{preview.note}</div>}
+              <div style={{marginTop:32,paddingTop:16,borderTop:"2px solid #CC0000",textAlign:"center",fontSize:11,color:"#8E8E93"}}>
+                Angy Company · Parcelles Assainies U18, Dakar · +221 71 053 89 17
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
+
+      {/* Liste devis */}
+      <TableWrap>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>{["Numéro","Client","Date","Total","Statut","Actions"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+          <tbody>
+            {devis.length===0&&<tr><Td colSpan={6} style={{textAlign:"center",color:theme.textMuted,padding:"2rem"}}>Aucun devis</Td></tr>}
+            {devis.map(d=>(
+              <tr key={d.id}>
+                <Td><strong style={{color:"#BF5AF2"}}>#{d.numero}</strong></Td>
+                <Td style={{color:theme.text,fontWeight:600}}>{d.client}</Td>
+                <Td style={{color:theme.textMuted,fontSize:13}}>{d.date}</Td>
+                <Td style={{fontWeight:700,color:"#0A84FF"}}>{xof(d.total)}</Td>
+                <Td><span style={{background:statutColor(d.statut)+"22",color:statutColor(d.statut),padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:700}}>{d.statut}</span></Td>
+                <Td>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>setPreview(d)} style={{background:"rgba(191,90,242,0.12)",border:"1px solid #BF5AF2",color:"#BF5AF2",padding:"4px 10px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>👁 Voir</button>
+                    {d.statut==="En attente"&&<button onClick={()=>convertirEnFacture(d)} style={{background:"rgba(48,209,88,0.12)",border:"1px solid #30D158",color:"#30D158",padding:"4px 10px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>✅ Facturer</button>}
+                    <button onClick={()=>del(d.id)} style={{background:"none",border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"4px 8px",borderRadius:7,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🗑</button>
+                  </div>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableWrap>
+    </div>
+  );
+}
+
 // ─── Clients ──────────────────────────────────────────────────────────────────
 function Clients({clients,setClients,factures,showToast,rechercheFiltre=""}) {
   const {theme}=useTheme();
@@ -2274,6 +2525,7 @@ export default function App() {
   const [ventes,setVentes]=useState([]);
   const [factures,setFactures]=useState([]);
   const [clients,setClients]=useState([]);
+  const [devis,setDevis]=useState([]);
   const [catDep,setCatDep]=useState(DEFAULT_CAT_DEP);
   const [catStk,setCatStk]=useState(DEFAULT_CAT_STK);
   const [loading,setLoading]=useState(true);
@@ -2302,19 +2554,21 @@ export default function App() {
       setVentes(cache.ventes||[]);
       setFactures(cache.factures||[]);
       setClients(cache.clients||[]);
+      setDevis(cache.devis||[]);
     }
     // Puis essayer Supabase
     (async()=>{
       try{
-        const [d,s,v,f,c]=await Promise.all([
+        const [d,s,v,f,c,dv]=await Promise.all([
           dbGet("depenses"),dbGet("stock"),
           dbGet("ventes"),dbGet("factures").catch(()=>[]),
-          dbGet("clients").catch(()=>[])
+          dbGet("clients").catch(()=>[]),
+          dbGet("devis").catch(()=>[])
         ]);
-        const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[],clients:c||[]};
+        const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[],clients:c||[],devis:dv||[]};
         setDepenses(data.depenses);setStock(data.stock);
         setVentes(data.ventes);setFactures(data.factures);
-        setClients(data.clients);
+        setClients(data.clients);setDevis(data.devis);
         saveAngyCache(data);
         setOffline(false);
       }catch(e){
@@ -2357,12 +2611,13 @@ export default function App() {
     ...(isAdmin||isComptable?[{id:"depenses",label:"Dépenses",icon:"📤"}]:[]),
     ...(isAdmin||isVendeur?[{id:"stock",label:"Stock",icon:"📦",badge:alertes}]:[]),
     ...(isAdmin||isVendeur?[{id:"ventes",label:"Ventes",icon:"💸"}]:[]),
+    ...(isAdmin||isVendeur||isComptable?[{id:"devis",label:"Devis",icon:"📋"}]:[]),
     ...(isAdmin||isVendeur||isComptable?[{id:"factures",label:"Factures",icon:"🧾"}]:[]),
     ...(isAdmin||isVendeur?[{id:"clients",label:"Clients",icon:"👥"}]:[]),
     ...(isAdmin||isComptable?[{id:"benefices",label:"Bénéfices",icon:"📈"}]:[]),
-    ...(isAdmin||isComptable?[{id:"rapports",label:"Rapports",icon:"📋"}]:[]),
+    ...(isAdmin||isComptable?[{id:"rapports",label:"Rapports",icon:"📊"}]:[]),
     ...(isAdmin?[{id:"categories",label:"Catégories",icon:"🏷️"}]:[]),
-    ...(isAdmin?[{id:"utilisateurs",label:"Utilisateurs",icon:"👥"}]:[]),
+    ...(isAdmin?[{id:"utilisateurs",label:"Utilisateurs",icon:"👤"}]:[]),
   ];
 
   return (
@@ -2448,6 +2703,7 @@ export default function App() {
               {page==="depenses"   &&<Depenses    depenses={depenses} setDepenses={setDepenses} catDep={catDep} stock={stock} setStock={setStock} showToast={showToast} rechercheFiltre={rechercheFiltre}/>}
               {page==="stock"      &&<Stock       stock={stock} setStock={setStock} ventes={ventes} setVentes={setVentes} factures={factures} setFactures={setFactures} depenses={depenses} setDepenses={setDepenses} catStk={catStk} showToast={showToast} setPage={setPage} rechercheFiltre={rechercheFiltre}/>}
               {page==="ventes"     &&<Ventes      ventes={ventes} setVentes={setVentes} factures={factures} catStk={catStk} showToast={showToast}/>}
+              {page==="devis"      &&<Devis       devis={devis} setDevis={setDevis} factures={factures} setFactures={setFactures} stock={stock} clients={clients} showToast={showToast}/>}
               {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} clients={clients} rechercheFiltre={rechercheFiltre}/>}
               {page==="clients"    &&<Clients     clients={clients} setClients={setClients} factures={factures} showToast={showToast} rechercheFiltre={rechercheFiltre}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock} factures={factures}/>}
