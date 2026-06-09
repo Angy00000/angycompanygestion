@@ -1424,10 +1424,21 @@ function Ventes({ventes,setVentes,factures,catStk,showToast}) {
 // ─── Gestion Utilisateurs Angy ────────────────────────────────────────────────
 function AngyUtilisateurs({showToast}) {
   const {theme}=useTheme();
-  const [users,setUsers]=useState(()=>loadAngyUsers());
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
   const [show,setShow]=useState(false);
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState({nom:"",prenom:"",email:"",mot_de_passe:"",role:"vendeur",actif:true});
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const rows=await dbGet("utilisateurs_angy");
+        setUsers(rows||[]);
+      }catch(e){showToast("Erreur de chargement",true);}
+      setLoading(false);
+    })();
+  },[]);
 
   const ROLES=[
     {v:"admin",    l:"👑 Administrateur — Accès total"},
@@ -1438,37 +1449,36 @@ function AngyUtilisateurs({showToast}) {
   const roleLabel=(r)=>r==="admin"?"👑 Admin":r==="vendeur"?"🛒 Vendeur":"💰 Comptable";
   const roleColor=(r)=>r==="admin"?"#FF9F0A":r==="vendeur"?"#30D158":"#0A84FF";
 
-  const save=()=>{
+  const save=async()=>{
     if(!form.nom||!form.email||(!editId&&!form.mot_de_passe))return showToast("Tous les champs requis",true);
     if(users.find(u=>u.email===form.email&&u.id!==editId))return showToast("Email déjà utilisé",true);
-    let updated;
     if(editId){
-      updated=users.map(u=>u.id===editId?{...u,...form}:u);
+      await dbPatch("utilisateurs_angy",editId,{nom:form.nom,prenom:form.prenom,email:form.email,mot_de_passe:form.mot_de_passe||undefined,role:form.role,actif:form.actif});
+      setUsers(users.map(u=>u.id===editId?{...u,...form}:u));
       showToast("Utilisateur modifié ✓");
     } else {
-      const newUser={...form,id:Date.now()};
-      updated=[...users,newUser];
+      const rows=await dbAdd("utilisateurs_angy",{nom:form.nom,prenom:form.prenom,email:form.email,mot_de_passe:form.mot_de_passe,role:form.role,actif:true});
+      setUsers([...users,rows[0]]);
       showToast("Utilisateur créé ✓");
     }
-    saveAngyUsers(updated);
-    setUsers(updated);
     setForm({nom:"",prenom:"",email:"",mot_de_passe:"",role:"vendeur",actif:true});
     setEditId(null);setShow(false);
   };
 
-  const startEdit=(u)=>{setForm({nom:u.nom,prenom:u.prenom||"",email:u.email,mot_de_passe:u.mot_de_passe,role:u.role,actif:u.actif});setEditId(u.id);setShow(true);};
+  const startEdit=(u)=>{setForm({nom:u.nom,prenom:u.prenom||"",email:u.email,mot_de_passe:"",role:u.role,actif:u.actif});setEditId(u.id);setShow(true);};
 
-  const toggleActif=(id)=>{
-    const updated=users.map(u=>u.id===id?{...u,actif:!u.actif}:u);
-    saveAngyUsers(updated);setUsers(updated);
-    showToast("Statut mis à jour ✓");
+  const toggleActif=async(id,actif)=>{
+    await dbPatch("utilisateurs_angy",id,{actif:!actif});
+    setUsers(users.map(u=>u.id===id?{...u,actif:!actif}:u));
+    showToast(actif?"Compte désactivé":"Compte activé ✓");
   };
 
-  const del=(id)=>{
+  const del=async(id)=>{
     if(users.filter(u=>u.role==="admin").length===1&&users.find(u=>u.id===id)?.role==="admin")
       return showToast("Impossible de supprimer le dernier admin !",true);
-    const updated=users.filter(u=>u.id!==id);
-    saveAngyUsers(updated);setUsers(updated);showToast("Supprimé");
+    await dbDel("utilisateurs_angy",id);
+    setUsers(users.filter(u=>u.id!==id));
+    showToast("Supprimé");
   };
 
   return (
@@ -1544,7 +1554,7 @@ function AngyUtilisateurs({showToast}) {
             </div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>startEdit(u)} style={{flex:1,background:"rgba(255,159,10,0.12)",border:"1px solid #FF9F0A",color:"#FF9F0A",padding:"7px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>✏️ Modifier</button>
-              <button onClick={()=>toggleActif(u.id)} style={{flex:1,background:u.actif?"rgba(255,69,58,0.12)":"rgba(48,209,88,0.12)",border:`1px solid ${u.actif?"#FF453A":"#30D158"}`,color:u.actif?"#FF453A":"#30D158",padding:"7px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>
+              <button onClick={()=>toggleActif(u.id,u.actif)} style={{flex:1,background:u.actif?"rgba(255,69,58,0.12)":"rgba(48,209,88,0.12)",border:`1px solid ${u.actif?"#FF453A":"#30D158"}`,color:u.actif?"#FF453A":"#30D158",padding:"7px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>
                 {u.actif?"🔒 Désactiver":"🔓 Activer"}
               </button>
               <button onClick={()=>del(u.id)} style={{background:"none",border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"7px 10px",borderRadius:8,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🗑</button>
@@ -1562,20 +1572,6 @@ const loadAngySession = () => { try { return JSON.parse(localStorage.getItem(ANG
 const saveAngySession = (u) => localStorage.setItem(ANGY_SESSION, JSON.stringify(u));
 const clearAngySession = () => localStorage.removeItem(ANGY_SESSION);
 
-// Utilisateurs Angy par défaut (stockés localement)
-const ANGY_USERS_KEY = "angy_users";
-const loadAngyUsers = () => {
-  try {
-    const u=JSON.parse(localStorage.getItem(ANGY_USERS_KEY)||"null");
-    if(u)return u;
-    // Compte admin par défaut
-    const def=[{id:1,nom:"ANGY",prenom:"Admin",email:"admin@angy.com",mot_de_passe:"angy2024",role:"admin",actif:true}];
-    localStorage.setItem(ANGY_USERS_KEY,JSON.stringify(def));
-    return def;
-  } catch { return []; }
-};
-const saveAngyUsers = (u) => localStorage.setItem(ANGY_USERS_KEY, JSON.stringify(u));
-
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 function AngyLogin({onLogin}) {
   const [dark]=useState(()=>window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -1583,15 +1579,22 @@ function AngyLogin({onLogin}) {
   const [email,setEmail]=useState("");
   const [mdp,setMdp]=useState("");
   const [erreur,setErreur]=useState("");
+  const [loading,setLoading]=useState(false);
 
-  const login=()=>{
-    const users=loadAngyUsers();
-    const user=users.find(u=>u.email===email&&u.mot_de_passe===mdp&&u.actif);
-    if(user){
-      saveAngySession(user);
-      onLogin(user);
-    }
-    else setErreur("Email ou mot de passe incorrect");
+  const login=async()=>{
+    setErreur("");setLoading(true);
+    try{
+      const res=await fetch(`${SUPA_URL}/rest/v1/utilisateurs_angy?email=eq.${encodeURIComponent(email)}&mot_de_passe=eq.${encodeURIComponent(mdp)}&actif=eq.true`,{headers:dbHeaders});
+      const rows=await res.json();
+      if(rows&&rows.length>0){
+        saveAngySession(rows[0]);
+        onLogin(rows[0]);
+        window.location.reload();
+      } else {
+        setErreur("Email ou mot de passe incorrect");
+      }
+    }catch(e){setErreur("Erreur de connexion");}
+    setLoading(false);
   };
 
   return (
@@ -1615,8 +1618,8 @@ function AngyLogin({onLogin}) {
             </div>
           </div>
           {erreur&&<div style={{background:"#3A1C1C",color:"#FF453A",padding:"10px 14px",borderRadius:10,fontSize:13,fontWeight:600,marginBottom:14}}>❌ {erreur}</div>}
-          <button onClick={login} style={{width:"100%",background:"#0A84FF",color:"#fff",border:"none",padding:"14px",borderRadius:12,fontWeight:700,cursor:"pointer",fontSize:16,fontFamily:"inherit"}}>
-            Se connecter
+          <button onClick={login} style={{width:"100%",background:"#0A84FF",color:"#fff",border:"none",padding:"14px",borderRadius:12,fontWeight:700,cursor:"pointer",fontSize:16,fontFamily:"inherit",opacity:loading?0.7:1}}>
+            {loading?"Connexion...":"Se connecter"}
           </button>
           <div style={{textAlign:"center",marginTop:14,fontSize:12,color:dark?"#3A3A3C":"#AEAEB2"}}>
             Par défaut : admin@angy.com / angy2024
@@ -1784,14 +1787,12 @@ export default function App() {
                 </div>
               </div>
               <div style={{display:"flex",gap:10}}>
-                <button onClick={()=>{
+                <button onClick={async()=>{
                   if(!ancienMdp||!nouveauMdp||!confirmMdp)return showToast("Tous les champs requis",true);
                   if(ancienMdp!==user.mot_de_passe)return showToast("Ancien mot de passe incorrect",true);
                   if(nouveauMdp!==confirmMdp)return showToast("Les mots de passe ne correspondent pas",true);
                   if(nouveauMdp.length<6)return showToast("Minimum 6 caractères",true);
-                  const users=loadAngyUsers();
-                  const updated=users.map(u=>u.id===user.id?{...u,mot_de_passe:nouveauMdp}:u);
-                  saveAngyUsers(updated);
+                  await dbPatch("utilisateurs_angy",user.id,{mot_de_passe:nouveauMdp});
                   const newUser={...user,mot_de_passe:nouveauMdp};
                   setUser(newUser);saveAngySession(newUser);
                   setAncienMdp("");setNouveauMdp("");setConfirmMdp("");
