@@ -278,6 +278,25 @@ function Dashboard({depenses,stock,ventes,factures}) {
   const caHier=factures.filter(f=>f.date===hier).reduce((s,f)=>s+f.total,0);
   const caMois=factures.filter(f=>f.date?.startsWith(moisCourant)).reduce((s,f)=>s+f.total,0);
 
+  // Mois précédent
+  const moisPrec=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7);
+  const caMoisPrec=factures.filter(f=>f.date?.startsWith(moisPrec)).reduce((s,f)=>s+f.total,0);
+  const depMois=depenses.filter(d=>d.statut==="Approuvée"&&d.date?.startsWith(moisCourant)).reduce((s,d)=>s+d.montant,0);
+  const depMoisPrec=depenses.filter(d=>d.statut==="Approuvée"&&d.date?.startsWith(moisPrec)).reduce((s,d)=>s+d.montant,0);
+  const benMois=caMois-depMois;
+  const benMoisPrec=caMoisPrec-depMoisPrec;
+  const nbVentesMois=factures.filter(f=>f.date?.startsWith(moisCourant)).length;
+  const nbVentesMoisPrec=factures.filter(f=>f.date?.startsWith(moisPrec)).length;
+
+  // Calcul évolution %
+  const evol=(current,previous)=>{
+    if(previous===0)return current>0?100:0;
+    return Math.round(((current-previous)/previous)*100);
+  };
+  const evolCA=evol(caMois,caMoisPrec);
+  const evolBen=evol(benMois,benMoisPrec);
+  const evolVentes=evol(nbVentesMois,nbVentesMoisPrec);
+
   // Alertes stock
   const alertes=stock.filter(p=>p.qte<=p.seuil);
   const ruptures=stock.filter(p=>p.qte===0);
@@ -321,6 +340,43 @@ function Dashboard({depenses,stock,ventes,factures}) {
         <KPI label="Dépenses" value={xof(totalDep)} accent="#FF453A" icon="📤" sub={`${depenses.filter(d=>d.statut==="Approuvée").length} approuvées`}/>
         <KPI label="Valeur stock" value={xof(stockVal)} accent="#FF9F0A" icon="📦" sub={`${stock.length} produit${stock.length!==1?"s":""}`}/>
       </div>
+
+      {/* Comparaison mois/mois */}
+      <Card style={{marginBottom:16}}>
+        <CardTitle>📈 Comparaison mois/mois</CardTitle>
+        <div style={{fontSize:11,color:theme.textMuted,marginBottom:14}}>
+          {new Date(now.getFullYear(),now.getMonth()-1,1).toLocaleDateString("fr-FR",{month:"long"})} → {now.toLocaleDateString("fr-FR",{month:"long"})}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+          {[
+            {label:"Chiffre d'affaires",current:caMois,previous:caMoisPrec,evol:evolCA,icon:"💰",color:"#0A84FF"},
+            {label:"Bénéfice net",current:benMois,previous:benMoisPrec,evol:evolBen,icon:"📈",color:"#30D158"},
+            {label:"Nb ventes",current:nbVentesMois,previous:nbVentesMoisPrec,evol:evolVentes,icon:"🧾",color:"#BF5AF2",isCount:true},
+          ].map(item=>(
+            <div key={item.label} style={{background:theme.bg,borderRadius:12,padding:"16px",border:`1px solid ${theme.border}`}}>
+              <div style={{fontSize:12,color:theme.textMuted,marginBottom:8}}>{item.icon} {item.label}</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:11,color:theme.textFaint,marginBottom:2}}>Mois précédent</div>
+                  <div style={{fontSize:14,fontWeight:600,color:theme.textSub}}>{item.isCount?item.previous:xof(item.previous)}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:11,color:theme.textFaint,marginBottom:2}}>Ce mois</div>
+                  <div style={{fontSize:18,fontWeight:800,color:item.color}}>{item.isCount?item.current:xof(item.current)}</div>
+                </div>
+              </div>
+              {/* Barre de progression */}
+              <div style={{height:6,background:theme.border,borderRadius:99,overflow:"hidden",marginBottom:8}}>
+                <div style={{height:"100%",width:`${Math.min(100,item.previous>0?Math.round((item.current/Math.max(item.current,item.previous))*100):item.current>0?100:0)}%`,background:item.color,borderRadius:99,transition:"width 0.5s"}}/>
+              </div>
+              {/* Badge évolution */}
+              <div style={{display:"inline-flex",alignItems:"center",gap:4,background:item.evol>=0?"rgba(48,209,88,0.12)":"rgba(255,69,58,0.12)",color:item.evol>=0?"#30D158":"#FF453A",padding:"3px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>
+                {item.evol>=0?"🔺":"🔻"} {item.evol>=0?"+":""}{item.evol}% vs mois dernier
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* KPIs secondaires */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
