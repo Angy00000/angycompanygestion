@@ -2613,7 +2613,7 @@ export default function App() {
     ...(isAdmin||isVendeur?[{id:"ventes",label:"Ventes",icon:"💸"}]:[]),
     ...(isAdmin||isVendeur||isComptable?[{id:"devis",label:"Devis",icon:"📋"}]:[]),
     ...(isAdmin||isVendeur||isComptable?[{id:"factures",label:"Factures",icon:"🧾"}]:[]),
-    ...(isAdmin||isVendeur?[{id:"clients",label:"Clients",icon:"👥"}]:[]),
+    ...(isAdmin||isVendeur?[{id:"crm",label:"CRM",icon:"🎯"}]:[]),
     ...(isAdmin||isComptable?[{id:"benefices",label:"Bénéfices",icon:"📈"}]:[]),
     ...(isAdmin||isComptable?[{id:"rapports",label:"Rapports",icon:"📊"}]:[]),
     ...(isAdmin?[{id:"categories",label:"Catégories",icon:"🏷️"}]:[]),
@@ -2706,6 +2706,7 @@ export default function App() {
               {page==="devis"      &&<Devis       devis={devis} setDevis={setDevis} factures={factures} setFactures={setFactures} stock={stock} clients={clients} showToast={showToast}/>}
               {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} clients={clients} rechercheFiltre={rechercheFiltre}/>}
               {page==="clients"    &&<Clients     clients={clients} setClients={setClients} factures={factures} showToast={showToast} rechercheFiltre={rechercheFiltre}/>}
+              {page==="crm"        &&<CRM         showToast={showToast}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock} factures={factures}/>}
               {page==="rapports"   &&<Rapports    depenses={depenses} stock={stock} ventes={ventes} factures={factures} catStk={catStk}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
@@ -2765,5 +2766,309 @@ export default function App() {
         )}
       </div>
     </ThemeCtx.Provider>
+  );
+}
+
+// ─── CRM — SUIVI DES PROSPECTS ───────────────────────────────────────────────
+function CRM({showToast}) {
+  const {theme} = useContext(ThemeCtx);
+  const SUPA_URL_CRM = "https://nfpnhyvuwpzezwbmxtgd.supabase.co";
+  const SUPA_KEY_CRM = "sb_publishable_P8-5bnMCTeclywsL6zsmiA_tJADw-m1";
+  const headers = {"apikey":SUPA_KEY_CRM,"Authorization":`Bearer ${SUPA_KEY_CRM}`,"Content-Type":"application/json","Prefer":"return=representation"};
+
+  const STATUTS = ["Nouveau","En discussion","Devis envoyé","Vendu","Perdu"];
+  const SOURCES = ["Facebook","TikTok","Instagram","WhatsApp","Bouche à oreille","Site web","Autre"];
+  const PRODUITS = ["iPhone","MacBook","iPad","AirPods","Immobilier","Automobile","Autre"];
+  const STATUT_COLORS = {
+    "Nouveau":       {bg:"rgba(10,132,255,0.15)",color:"#0A84FF",border:"rgba(10,132,255,0.3)"},
+    "En discussion": {bg:"rgba(255,159,10,0.15)",color:"#FF9F0A",border:"rgba(255,159,10,0.3)"},
+    "Devis envoyé":  {bg:"rgba(191,90,242,0.15)",color:"#BF5AF2",border:"rgba(191,90,242,0.3)"},
+    "Vendu":         {bg:"rgba(48,209,88,0.15)", color:"#30D158",border:"rgba(48,209,88,0.3)"},
+    "Perdu":         {bg:"rgba(255,69,58,0.15)", color:"#FF453A",border:"rgba(255,69,58,0.3)"},
+  };
+
+  const [prospects, setProspects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filtre, setFiltre] = useState("tous");
+  const [recherche, setRecherche] = useState("");
+  const [modal, setModal] = useState(null);
+  const [form, setForm] = useState({nom:"",telephone:"",ville:"Dakar",produit:"iPhone",budget:"",source:"WhatsApp",statut:"Nouveau",notes:""});
+  const [noteInput, setNoteInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(()=>{ charger(); },[]);
+
+  const charger = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${SUPA_URL_CRM}/rest/v1/prospects?order=created_at.desc`,{headers});
+      if(r.ok){ const d=await r.json(); setProspects(d); localStorage.setItem("angy_crm",JSON.stringify(d)); }
+    } catch {
+      const c=localStorage.getItem("angy_crm");
+      if(c) setProspects(JSON.parse(c));
+    }
+    setLoading(false);
+  };
+
+  const ajouterProspect = async () => {
+    if(!form.nom||!form.telephone) return showToast("Nom et téléphone obligatoires");
+    setSaving(true);
+    const data={...form,created_at:new Date().toISOString(),historique:JSON.stringify([{date:new Date().toLocaleDateString("fr-FR"),action:"Créé",note:form.notes}])};
+    try {
+      const r=await fetch(`${SUPA_URL_CRM}/rest/v1/prospects`,{method:"POST",headers,body:JSON.stringify(data)});
+      if(r.ok){const [p]=await r.json();setProspects(prev=>[p,...prev]);}
+    } catch {
+      setProspects(prev=>[{...data,id:Date.now()},...prev]);
+    }
+    setModal(null);setForm({nom:"",telephone:"",ville:"Dakar",produit:"iPhone",budget:"",source:"WhatsApp",statut:"Nouveau",notes:""});
+    showToast("✅ Prospect ajouté !");setSaving(false);
+  };
+
+  const majStatut = async (id,statut) => {
+    try { await fetch(`${SUPA_URL_CRM}/rest/v1/prospects?id=eq.${id}`,{method:"PATCH",headers,body:JSON.stringify({statut})}); } catch {}
+    setProspects(p=>p.map(x=>x.id===id?{...x,statut}:x));
+    setModal(prev=>prev&&prev.id===id?{...prev,statut}:prev);
+    if(statut==="Vendu") showToast("🎉 Vente enregistrée !");
+  };
+
+  const ajouterNote = async (prospect) => {
+    if(!noteInput.trim()) return;
+    const hist=JSON.parse(prospect.historique||"[]");
+    hist.push({date:new Date().toLocaleDateString("fr-FR"),action:"Note",note:noteInput});
+    const h=JSON.stringify(hist);
+    const pr=new Date();pr.setDate(pr.getDate()+2);
+    try { await fetch(`${SUPA_URL_CRM}/rest/v1/prospects?id=eq.${prospect.id}`,{method:"PATCH",headers,body:JSON.stringify({historique:h,prochaine_relance:pr.toISOString()})}); } catch {}
+    setProspects(p=>p.map(x=>x.id===prospect.id?{...x,historique:h,prochaine_relance:pr.toISOString()}:x));
+    setModal(prev=>({...prev,historique:h,prochaine_relance:pr.toISOString()}));
+    setNoteInput("");showToast("✅ Note ajoutée !");
+  };
+
+  const supprimerProspect = async (id) => {
+    if(!window.confirm("Supprimer ce prospect ?")) return;
+    try { await fetch(`${SUPA_URL_CRM}/rest/v1/prospects?id=eq.${id}`,{method:"DELETE",headers}); } catch {}
+    setProspects(p=>p.filter(x=>x.id!==id));setModal(null);showToast("Supprimé");
+  };
+
+  const relancesDues = prospects.filter(p=>p.prochaine_relance&&new Date(p.prochaine_relance)<=new Date()&&p.statut!=="Vendu"&&p.statut!=="Perdu");
+
+  const filtres = prospects.filter(p=>{
+    const mf=filtre==="tous"||p.statut===filtre||(filtre==="relances"&&relancesDues.find(r=>r.id===p.id));
+    const mr=!recherche||p.nom?.toLowerCase().includes(recherche.toLowerCase())||p.telephone?.includes(recherche);
+    return mf&&mr;
+  });
+
+  const inp={width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"10px 13px",color:theme.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"};
+  const lbl={display:"block",fontSize:12,fontWeight:600,color:theme.textMuted,marginBottom:5};
+
+  return (
+    <div style={{padding:"20px 16px",maxWidth:1100,margin:"0 auto"}}>
+      {/* HEADER */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:800}}>🎯 CRM — Prospects</div>
+          <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>Suivez chaque prospect jusqu'à la vente</div>
+        </div>
+        <button onClick={()=>setModal("add")} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"11px 22px",borderRadius:12,fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 14px rgba(10,132,255,0.3)"}}>
+          + Nouveau prospect
+        </button>
+      </div>
+
+      {/* STATS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:12,marginBottom:20}}>
+        {[
+          {label:"Total",value:prospects.length,color:"#0A84FF",icon:"👥"},
+          {label:"Nouveaux",value:prospects.filter(p=>p.statut==="Nouveau").length,color:"#0A84FF",icon:"🆕"},
+          {label:"En cours",value:prospects.filter(p=>["En discussion","Devis envoyé"].includes(p.statut)).length,color:"#FF9F0A",icon:"💬"},
+          {label:"Vendus",value:prospects.filter(p=>p.statut==="Vendu").length,color:"#30D158",icon:"✅"},
+          {label:"Relances",value:relancesDues.length,color:"#FF453A",icon:"🔔"},
+        ].map(s=>(
+          <div key={s.label} onClick={()=>s.label==="Relances"&&setFiltre("relances")}
+            style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:14,padding:"14px 16px",cursor:s.label==="Relances"?"pointer":"default"}}>
+            <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
+            <div style={{fontSize:24,fontWeight:800,color:s.color}}>{s.value}</div>
+            <div style={{fontSize:12,color:theme.textMuted,marginTop:2}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ALERTE RELANCES */}
+      {relancesDues.length>0&&(
+        <div style={{background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <span style={{fontSize:20}}>🔔</span>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,color:"#FF453A"}}>{relancesDues.length} relance{relancesDues.length>1?"s":""} à faire !</div>
+            <div style={{fontSize:12,color:theme.textMuted}}>{relancesDues.map(r=>r.nom).join(", ")}</div>
+          </div>
+          <button onClick={()=>setFiltre("relances")} style={{background:"#FF453A",color:"#fff",border:"none",padding:"7px 14px",borderRadius:9,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Voir</button>
+        </div>
+      )}
+
+      {/* FILTRES */}
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="🔍 Rechercher..."
+          style={{...inp,width:"auto",flex:1,minWidth:160,padding:"8px 13px"}}/>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {[["tous","Tous"],["Nouveau","🆕 Nouveau"],["En discussion","💬 Discussion"],["Devis envoyé","📋 Devis"],["Vendu","✅ Vendu"],["Perdu","❌ Perdu"],["relances","🔔 Relances"]].map(([id,l])=>(
+            <button key={id} onClick={()=>setFiltre(id)} style={{padding:"6px 12px",borderRadius:9,border:`1px solid ${filtre===id?"#0A84FF":theme.border}`,background:filtre===id?"rgba(10,132,255,0.15)":"transparent",color:filtre===id?"#0A84FF":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* LISTE */}
+      {loading?<div style={{textAlign:"center",padding:"3rem",color:theme.textMuted}}>Chargement...</div>:
+       filtres.length===0?<div style={{textAlign:"center",padding:"3rem",color:theme.textMuted}}><div style={{fontSize:48,marginBottom:10}}>🎯</div><div style={{fontSize:16,fontWeight:600}}>Aucun prospect</div></div>:
+       <div style={{display:"grid",gap:8}}>
+        {filtres.map(p=>{
+          const sc=STATUT_COLORS[p.statut]||STATUT_COLORS["Nouveau"];
+          const rd=relancesDues.find(r=>r.id===p.id);
+          return (
+            <div key={p.id} onClick={()=>{setModal(p);setNoteInput("");}}
+              style={{background:theme.card,border:`1px solid ${rd?"rgba(255,69,58,0.4)":theme.border}`,borderRadius:14,padding:"14px 16px",cursor:"pointer",display:"flex",gap:12,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+              <div style={{display:"flex",gap:12,alignItems:"center",flex:1,minWidth:0}}>
+                <div style={{width:42,height:42,borderRadius:12,background:sc.bg,border:`1px solid ${sc.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                  {p.produit==="iPhone"?"📱":p.produit==="MacBook"?"💻":p.produit==="Immobilier"?"🏠":p.produit==="Automobile"?"🚗":"📦"}
+                </div>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:15,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    {p.nom}
+                    {rd&&<span style={{fontSize:10,background:"rgba(255,69,58,0.15)",color:"#FF453A",border:"1px solid rgba(255,69,58,0.3)",borderRadius:99,padding:"2px 7px"}}>🔔 Relance</span>}
+                  </div>
+                  <div style={{fontSize:12,color:theme.textMuted,marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <span>📞 {p.telephone}</span>
+                    {p.ville&&<span>📍 {p.ville}</span>}
+                    {p.budget&&<span>💰 {p.budget}</span>}
+                    <span>📡 {p.source}</span>
+                  </div>
+                </div>
+              </div>
+              <span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:99,...sc,flexShrink:0}}>{p.statut}</span>
+            </div>
+          );
+        })}
+       </div>
+      }
+
+      {/* MODAL AJOUT */}
+      {modal==="add"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
+          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${theme.border}`}}>
+            <div style={{fontWeight:800,fontSize:18,marginBottom:18}}>+ Nouveau prospect</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Nom *</label><input style={inp} value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Mamadou Diallo"/></div>
+              <div><label style={lbl}>Téléphone *</label><input style={inp} value={form.telephone} onChange={e=>setForm(f=>({...f,telephone:e.target.value}))} placeholder="+221 XX XXX XX XX"/></div>
+              <div><label style={lbl}>Ville</label><input style={inp} value={form.ville} onChange={e=>setForm(f=>({...f,ville:e.target.value}))}/></div>
+              <div><label style={lbl}>Produit</label><select style={inp} value={form.produit} onChange={e=>setForm(f=>({...f,produit:e.target.value}))}>{PRODUITS.map(p=><option key={p}>{p}</option>)}</select></div>
+              <div><label style={lbl}>Budget</label><input style={inp} value={form.budget} onChange={e=>setForm(f=>({...f,budget:e.target.value}))} placeholder="Ex: 400 000 FCFA"/></div>
+              <div><label style={lbl}>Source</label><select style={inp} value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))}>{SOURCES.map(s=><option key={s}>{s}</option>)}</select></div>
+              <div><label style={lbl}>Statut</label><select style={inp} value={form.statut} onChange={e=>setForm(f=>({...f,statut:e.target.value}))}>{STATUTS.map(s=><option key={s}>{s}</option>)}</select></div>
+              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Notes</label><textarea style={{...inp,resize:"vertical",minHeight:65}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Détails..."/></div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={ajouterProspect} disabled={saving} style={{flex:1,background:"#0A84FF",color:"#fff",border:"none",padding:"12px",borderRadius:12,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>{saving?"⏳...":"✅ Enregistrer"}</button>
+              <button onClick={()=>setModal(null)} style={{flex:1,background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,padding:"12px",borderRadius:12,fontWeight:600,fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DÉTAIL */}
+      {modal&&modal!=="add"&&(()=>{
+        const sc=STATUT_COLORS[modal.statut]||STATUT_COLORS["Nouveau"];
+        const hist=JSON.parse(modal.historique||"[]");
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
+            <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${theme.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+                <div>
+                  <div style={{fontWeight:800,fontSize:20}}>{modal.nom}</div>
+                  <div style={{fontSize:13,color:theme.textMuted,marginTop:3}}>📞 {modal.telephone} · 📍 {modal.ville}</div>
+                </div>
+                <button onClick={()=>setModal(null)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:theme.textMuted}}>✕</button>
+              </div>
+
+              {/* Infos */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+                {[["Produit",modal.produit],["Budget",modal.budget||"—"],["Source",modal.source],["Ajouté le",new Date(modal.created_at).toLocaleDateString("fr-FR")]].map(([k,v])=>(
+                  <div key={k} style={{background:theme.toggleBg,borderRadius:10,padding:"10px 12px"}}>
+                    <div style={{fontSize:11,color:theme.textMuted}}>{k}</div>
+                    <div style={{fontWeight:700,fontSize:13,marginTop:2}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Statut */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>Statut</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {STATUTS.map(s=>{const c=STATUT_COLORS[s];return(
+                    <button key={s} onClick={()=>majStatut(modal.id,s)} style={{padding:"6px 12px",borderRadius:99,border:`1px solid ${modal.statut===s?c.border:theme.border}`,background:modal.statut===s?c.bg:"transparent",color:modal.statut===s?c.color:theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+                      {s}
+                    </button>
+                  );})}
+                </div>
+              </div>
+
+              {/* Relances */}
+              <div style={{marginBottom:16,background:"rgba(10,132,255,0.08)",border:"1px solid rgba(10,132,255,0.2)",borderRadius:12,padding:"12px 14px"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#0A84FF",marginBottom:8,textTransform:"uppercase"}}>🔔 Programmer une relance</div>
+                <div style={{display:"flex",gap:8}}>
+                  {[2,7,30].map(j=>(
+                    <button key={j} onClick={()=>{
+                      const d=new Date();d.setDate(d.getDate()+j);
+                      fetch(`${SUPA_URL_CRM}/rest/v1/prospects?id=eq.${modal.id}`,{method:"PATCH",headers,body:JSON.stringify({prochaine_relance:d.toISOString()})}).catch(()=>{});
+                      setProspects(p=>p.map(x=>x.id===modal.id?{...x,prochaine_relance:d.toISOString()}:x));
+                      setModal(prev=>({...prev,prochaine_relance:d.toISOString()}));
+                      showToast(`🔔 Relance J+${j} programmée !`);
+                    }} style={{flex:1,padding:"8px",borderRadius:9,background:"rgba(10,132,255,0.1)",border:"1px solid rgba(10,132,255,0.25)",color:"#0A84FF",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+                      J+{j}
+                    </button>
+                  ))}
+                </div>
+                {modal.prochaine_relance&&<div style={{fontSize:11,color:theme.textMuted,marginTop:6}}>Prochaine : {new Date(modal.prochaine_relance).toLocaleDateString("fr-FR")}</div>}
+              </div>
+
+              {/* Note */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>Ajouter une note</div>
+                <div style={{display:"flex",gap:8}}>
+                  <input value={noteInput} onChange={e=>setNoteInput(e.target.value)} placeholder="Ex: Client intéressé, attend son salaire..."
+                    style={{...inp,flex:1}} onKeyDown={e=>e.key==="Enter"&&ajouterNote(modal)}/>
+                  <button onClick={()=>ajouterNote(modal)} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 14px",borderRadius:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>+</button>
+                </div>
+              </div>
+
+              {/* Historique */}
+              {hist.length>0&&(
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>Historique</div>
+                  {[...hist].reverse().map((h,i)=>(
+                    <div key={i} style={{background:theme.toggleBg,borderRadius:9,padding:"8px 12px",marginBottom:5,display:"flex",gap:10}}>
+                      <div style={{fontSize:10,color:theme.textMuted,flexShrink:0,paddingTop:1}}>{h.date}</div>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:"#0A84FF"}}>{h.action}</div>
+                        {h.note&&<div style={{fontSize:12,color:theme.text,marginTop:1}}>{h.note}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <a href={`https://wa.me/${modal.telephone?.replace(/[\s+]/g,"")}`} target="_blank" rel="noreferrer"
+                  style={{display:"block",textAlign:"center",background:"rgba(37,211,102,0.12)",border:"1px solid rgba(37,211,102,0.3)",color:"#25D366",padding:"11px",borderRadius:12,fontWeight:700,fontSize:14,textDecoration:"none"}}>
+                  💬 WhatsApp
+                </a>
+                <button onClick={()=>supprimerProspect(modal.id)} style={{background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",color:"#FF453A",padding:"11px",borderRadius:12,fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+                  🗑 Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
   );
 }
