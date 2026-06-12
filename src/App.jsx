@@ -46,7 +46,11 @@ const syncAngyQueue = async () => {
 };
 
 // ─── Fonctions DB avec fallback offline ───────────────────────────────────────
-const dbGet = (t) => fetch(`${SUPA_URL}/rest/v1/${t}?order=id.desc`,{headers:dbHeaders}).then(r=>r.json());
+const dbGet = async (t) => {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${t}?order=id.desc`,{headers:dbHeaders});
+  if(!r.ok){ const err = await r.text(); console.error(`dbGet ${t} error:`,r.status,err); return []; }
+  return r.json();
+};
 
 const dbAdd = async (t, d) => {
   if(isOnline()){
@@ -2581,12 +2585,14 @@ export default function App() {
     // Puis essayer Supabase
     (async()=>{
       try{
+        console.log("🔄 Chargement depuis Supabase...");
         const [d,s,v,f,c,dv]=await Promise.all([
           dbGet("depenses"),dbGet("stock"),
           dbGet("ventes"),dbGet("factures").catch(()=>[]),
           dbGet("clients").catch(()=>[]),
           dbGet("devis").catch(()=>[])
         ]);
+        console.log("✅ Données chargées:",{depenses:d?.length,stock:s?.length,ventes:v?.length,factures:f?.length});
         const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[],clients:c||[],devis:dv||[]};
         setDepenses(data.depenses);setStock(data.stock);
         setVentes(data.ventes);setFactures(data.factures);
@@ -2594,6 +2600,7 @@ export default function App() {
         saveAngyCache(data);
         setOffline(false);
       }catch(e){
+        console.error("❌ Erreur chargement:",e);
         setOffline(true);
       }
       setLoading(false);
