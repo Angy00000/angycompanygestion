@@ -2812,7 +2812,16 @@ function CRM({showToast}) {
     "Vendu":         {bg:"rgba(48,209,88,0.15)", color:"#30D158",border:"rgba(48,209,88,0.3)",icon:"✅"},
     "Perdu":         {bg:"rgba(255,69,58,0.15)", color:"#FF453A",border:"rgba(255,69,58,0.3)",icon:"❌"},
   };
-  const PRODUIT_ICON = {iPhone:"📱",MacBook:"💻",iPad:"📲",AirPods:"🎧",Immobilier:"🏠",Automobile:"🚗",Autre:"📦"};
+  const PI = {iPhone:"📱",MacBook:"💻",iPad:"📲",AirPods:"🎧",Immobilier:"🏠",Automobile:"🚗",Autre:"📦"};
+
+  const TEMPLATES = [
+    {label:"🆕 Premier contact", icon:"👋", msg:(p)=>"Bonjour "+((p&&p.nom)||"[Nom]")+" ! 😊\n\nMerci de nous avoir contacté chez ANGY COMPANY.\n\nJe suis Ange, votre conseiller tech. Quel iPhone vous intéresse ?\n\n📱 Nous avons du stock disponible !\n\nAngy Company — +221 78 116 32 86"},
+    {label:"🔔 Relance J+2", icon:"📲", msg:(p)=>"Bonjour "+((p&&p.nom)||"[Nom]")+" ! 😊\n\nJe voulais savoir si vous êtes toujours intéressé par "+((p&&p.produit)||"l'iPhone")+" ?\n\nOn a du stock disponible et les prix sont toujours les mêmes.\n\n📞 +221 78 116 32 86\nAngy Company"},
+    {label:"🔥 Relance J+7", icon:"⚡", msg:(p)=>"Bonjour "+((p&&p.nom)||"[Nom]")+" !\n\n🔥 Offre spéciale cette semaine chez ANGY COMPANY !\n\nStock limité — ne ratez pas cette opportunité !\n\n✅ Authentique · 🚚 Livraison Dakar\n💳 Wave · Orange Money · Espèces\n\n📞 +221 78 116 32 86"},
+    {label:"💰 Envoi de prix", icon:"📋", msg:(p)=>"Bonjour "+((p&&p.nom)||"[Nom]")+" ! 😊\n\nVoici nos prix actuels :\n\n📱 iPhone 15 → 290 000 F\n📱 iPhone 16 → 380 000 F\n📱 iPhone 17 → 510 000 F\n📱 iPhone 17 Pro Max → 780 000 F\n\n✅ Tous authentiques\n🚚 Livraison Dakar\n\n📞 +221 78 116 32 86"},
+    {label:"✅ Confirmation vente", icon:"🎉", msg:(p)=>"Bonjour "+((p&&p.nom)||"[Nom]")+" ! 🎉\n\nMerci pour votre confiance chez ANGY COMPANY !\n\nVotre commande est confirmée ✅\nNous vous contacterons pour la livraison.\n\nBonne utilisation ! 😊\n— Ange, ANGY COMPANY"},
+    {label:"🚚 Livraison en cours", icon:"🚚", msg:(p)=>"Bonjour "+((p&&p.nom)||"[Nom]")+" ! 🚚\n\nVotre commande est en route !\nNotre livreur sera chez vous dans les prochaines heures.\n\nRestez disponible svp.\n\nMerci ! 😊 — ANGY COMPANY"},
+  ];
 
   const [prospects, setProspects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2831,40 +2840,20 @@ function CRM({showToast}) {
   const [quickForm, setQuickForm] = useState({nom:"",telephone:"",produit:"iPhone",source:"WhatsApp"});
   const [showQuick, setShowQuick] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [selectedProspectTemplate, setSelectedProspectTemplate] = useState(null);
+  const [selTemplate, setSelTemplate] = useState(null);
 
-  const TEMPLATES_WHATSAPP = [
-    {
-      label:"🆕 Premier contact",
-      icon:"👋",
-      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 😊\n\nMerci de nous avoir contacté chez ANGY COMPANY.\n\nJe suis Ange, votre conseiller tech. Quel iPhone vous intéresse ?\n\n📱 Nous avons du stock disponible !\n\nAngy Company — +221 78 116 32 86`
-    },
-    {
-      label:"🔔 Relance J+2",
-      icon:"📲",
-      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 😊\n\nJe voulais savoir si vous êtes toujours intéressé par ${p?.produit||"l'iPhone"} ?\n\nOn a du stock disponible et les prix sont toujours les mêmes. N'hésitez pas !\n\n📞 +221 78 116 32 86\nAngy Company`
-    },
-    {
-      label:"🔥 Relance J+7",
-      icon:"⚡",
-      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} !\n\n🔥 Offre spéciale cette semaine chez ANGY COMPANY !\n\nStock limité sur ${p?.produit||"les iPhones"} — ne ratez pas cette opportunité !\n\n✅ Authentique · 🚚 Livraison Dakar\n💳 Wave · Orange Money · Espèces\n\n📞 +221 78 116 32 86`
-    },
-    {
-      label:"💰 Envoi de prix",
-      icon:"📋",
-      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 😊\n\nVoici nos prix actuels :\n\n📱 iPhone 15 → 290 000 F\n📱 iPhone 16 → 380 000 F\n📱 iPhone 17 → 510 000 F\n📱 iPhone 17 Pro Max → 780 000 F\n\n✅ Tous authentiques & garantis\n🚚 Livraison sur Dakar\n\nLequel vous intéresse ?\n📞 +221 78 116 32 86`
-    },
-    {
-      label:"✅ Confirmation vente",
-      icon:"🎉",
-      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🎉\n\nMerci pour votre confiance chez ANGY COMPANY !\n\nVotre commande est confirmée ✅\n\nNous vous contacterons pour la livraison.\n\nBonne utilisation ! 😊\n— Ange, ANGY COMPANY`
-    },
-    {
-      label:"📦 Livraison en cours",
-      icon:"🚚",
-      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🚚\n\nVotre commande est en route !\n\nNotre livreur sera chez vous dans les prochaines heures.\n\nRestez disponible sur ce numéro svp.\n\nMerci de votre confiance ! 😊\n— ANGY COMPANY`
-    },
-  ];
+  const parseBulk = (text) => {
+    try {
+      const lines = text.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
+      const parsed = lines.map(line=>{
+        const m = line.match(/(\+?221[\s\-]?\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\+?7\d[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\d{9,12})/);
+        const phone = m ? m[0].replace(/[\s\-]/g,"") : "";
+        const nom = line.replace(m?m[0]:"","").replace(/[,;:|\-]/g,"").trim()||"Prospect";
+        return {nom,telephone:phone,produit:"iPhone",source:"WhatsApp",statut:"Nouveau"};
+      }).filter(p=>p.telephone);
+      setBulkParsed(parsed);
+    } catch { setBulkParsed([]); }
+  };
 
   useEffect(()=>{ charger(); },[]);
 
@@ -2872,10 +2861,9 @@ function CRM({showToast}) {
     setLoading(true);
     try {
       const r = await fetch(`${SURL}/rest/v1/prospects?order=created_at.desc`,{headers:H});
-      if(r.ok){ const d=await r.json(); setProspects(d); localStorage.setItem("angy_crm",JSON.stringify(d)); }
+      if(r.ok){ const d=await r.json(); setProspects(Array.isArray(d)?d:[]); localStorage.setItem("angy_crm",JSON.stringify(d)); }
     } catch {
-      const c=localStorage.getItem("angy_crm");
-      if(c) setProspects(JSON.parse(c));
+      try { const c=localStorage.getItem("angy_crm"); if(c) setProspects(JSON.parse(c)); } catch { setProspects([]); }
     }
     setLoading(false);
   };
@@ -2890,7 +2878,7 @@ function CRM({showToast}) {
     } catch { setProspects(prev=>[{...data,id:Date.now()},...prev]); }
     setModal(null);
     setForm({nom:"",telephone:"",ville:"Dakar",produit:"iPhone",budget:"",source:"WhatsApp",statut:"Nouveau",notes:""});
-    showToast("✅ Prospect ajouté !");setSaving(false);
+    showToast("✅ Prospect ajouté !"); setSaving(false);
   };
 
   const majStatut = async (id,statut) => {
@@ -2905,84 +2893,60 @@ function CRM({showToast}) {
     const hist=JSON.parse(prospect.historique||"[]");
     hist.push({date:new Date().toLocaleDateString("fr-FR"),action:"Note",note:noteInput});
     const h=JSON.stringify(hist);
-    const pr=new Date();pr.setDate(pr.getDate()+2);
+    const pr=new Date(); pr.setDate(pr.getDate()+2);
     try { await fetch(`${SURL}/rest/v1/prospects?id=eq.${prospect.id}`,{method:"PATCH",headers:H,body:JSON.stringify({historique:h,prochaine_relance:pr.toISOString()})}); } catch {}
     setProspects(p=>p.map(x=>x.id===prospect.id?{...x,historique:h,prochaine_relance:pr.toISOString()}:x));
     setModal(prev=>({...prev,historique:h,prochaine_relance:pr.toISOString()}));
-    setNoteInput("");showToast("✅ Note ajoutée !");
+    setNoteInput(""); showToast("✅ Note ajoutée !");
   };
 
   const supprimer = async (id) => {
     if(!window.confirm("Supprimer ce prospect ?")) return;
     try { await fetch(`${SURL}/rest/v1/prospects?id=eq.${id}`,{method:"DELETE",headers:H}); } catch {}
-    setProspects(p=>p.filter(x=>x.id!==id));setModal(null);showToast("Supprimé");
+    setProspects(p=>p.filter(x=>x.id!==id)); setModal(null); showToast("Supprimé");
   };
 
-  // Export CSV
   const exportCSV = () => {
     const cols = ["Nom","Téléphone","Ville","Produit","Budget","Source","Statut","Date","Notes"];
-    const rows = prospects.map(p=>[p.nom,p.telephone,p.ville,p.produit,p.budget,p.source,p.statut,new Date(p.created_at).toLocaleDateString("fr-FR"),p.notes||""].map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(","));
+    const rows = prospects.map(p=>[p.nom,p.telephone,p.ville,p.produit,p.budget,p.source,p.statut,new Date(p.created_at).toLocaleDateString("fr-FR"),p.notes||""].map(v=>'"'+(v||"").replace(/"/g,'""')+'"').join(","));
     const csv = [cols.join(","),...rows].join("\n");
     const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href=url; a.download=`prospects_${new Date().toLocaleDateString("fr-FR").replace(/\//g,"-")}.csv`; a.click();
+    const a = document.createElement("a"); a.href=url; a.download="prospects.csv"; a.click();
     showToast("✅ Export CSV téléchargé !");
-  };
-    const lines = text.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
-    const parsed = lines.map(line=>{
-      // Cherche un numéro de téléphone dans la ligne
-      const phoneMatch = line.match(/(\+?221[\s\-]?\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\+?7\d[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\d{9,12})/);
-      const phone = phoneMatch ? phoneMatch[0].replace(/[\s\-]/g,"") : "";
-      // Le nom est tout ce qui n'est pas le numéro
-      const nom = line.replace(phoneMatch?phoneMatch[0]:"","").replace(/[,;:|-]/g,"").trim() || "Prospect";
-      return {nom: nom||"Prospect", telephone: phone, produit:"iPhone", source:"WhatsApp", statut:"Nouveau", valide:!!phone};
-    }).filter(p=>p.telephone);
-    setBulkParsed(parsed);
   };
 
   const importerTous = async () => {
     if(bulkParsed.length===0) return showToast("Aucun prospect à importer");
     setBulkImporting(true);
-    let count = 0;
-    for(const p of bulkParsed) {
-      const data={...p,ville:"Dakar",budget:"",notes:"",created_at:new Date().toISOString(),historique:JSON.stringify([{date:new Date().toLocaleDateString("fr-FR"),action:"Import en masse",note:"Importé depuis WhatsApp"}])};
+    let count=0;
+    for(const p of bulkParsed){
+      const data={...p,ville:"Dakar",budget:"",notes:"",created_at:new Date().toISOString(),historique:JSON.stringify([{date:new Date().toLocaleDateString("fr-FR"),action:"Import masse",note:"Importé depuis WhatsApp"}])};
       try{
         const r=await fetch(`${SURL}/rest/v1/prospects`,{method:"POST",headers:H,body:JSON.stringify(data)});
-        if(r.ok){const [newP]=await r.json();setProspects(prev=>[newP,...prev]);count++;}
-      }catch{
-        setProspects(prev=>[{...data,id:Date.now()+count},...prev]);count++;
-      }
-      await new Promise(r=>setTimeout(r,100)); // Petit délai entre chaque
+        if(r.ok){const [np]=await r.json();setProspects(prev=>[np,...prev]);count++;}
+      }catch{ setProspects(prev=>[{...data,id:Date.now()+count},...prev]);count++; }
+      await new Promise(r=>setTimeout(r,100));
     }
     showToast(`✅ ${count} prospects importés !`);
-    setBulkImporting(false);
-    setShowBulk(false);
-    setBulkText("");
-    setBulkParsed([]);
+    setBulkImporting(false); setShowBulk(false); setBulkText(""); setBulkParsed([]);
   };
 
-  const parseBulk = (text) => {
-
-  // Relances dues
   const relances = prospects.filter(p=>p.prochaine_relance&&new Date(p.prochaine_relance)<=new Date()&&!["Vendu","Perdu"].includes(p.statut));
-
-  // Filtres
   const filtres = prospects.filter(p=>{
-    const mf = filtre==="tous"||p.statut===filtre||(filtre==="relances"&&relances.find(r=>r.id===p.id));
-    const mr = !recherche||p.nom?.toLowerCase().includes(recherche.toLowerCase())||p.telephone?.includes(recherche)||p.produit?.toLowerCase().includes(recherche.toLowerCase());
+    const mf=filtre==="tous"||p.statut===filtre||(filtre==="relances"&&relances.find(r=>r.id===p.id));
+    const mr=!recherche||p.nom?.toLowerCase().includes(recherche.toLowerCase())||p.telephone?.includes(recherche);
     return mf&&mr;
   });
+  const total=prospects.length;
+  const vendus=prospects.filter(p=>p.statut==="Vendu").length;
+  const tauxConv=total>0?Math.round((vendus/total)*100):0;
+  const parSource=SOURCES.reduce((acc,s)=>({...acc,[s]:prospects.filter(p=>p.source===s).length}),{});
+  const parProduit=PRODUITS.reduce((acc,p)=>({...acc,[p]:prospects.filter(x=>x.produit===p).length}),{});
+  const meilleurSource=Object.entries(parSource).sort((a,b)=>b[1]-a[1])[0];
 
-  // Stats
-  const total = prospects.length;
-  const vendus = prospects.filter(p=>p.statut==="Vendu").length;
-  const tauxConv = total>0?Math.round((vendus/total)*100):0;
-  const parSource = SOURCES.reduce((acc,s)=>({...acc,[s]:prospects.filter(p=>p.source===s).length}),{});
-  const parProduit = PRODUITS.reduce((acc,p)=>({...acc,[p]:prospects.filter(x=>x.produit===p).length}),{});
-  const meilleurSource = Object.entries(parSource).sort((a,b)=>b[1]-a[1])[0];
-
-  const inp = {width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"10px 13px",color:theme.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"};
-  const lbl = {display:"block",fontSize:12,fontWeight:600,color:theme.textMuted,marginBottom:5};
+  const inp={width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"10px 13px",color:theme.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"};
+  const lbl={display:"block",fontSize:12,fontWeight:600,color:theme.textMuted,marginBottom:5};
 
   return (
     <div style={{padding:"20px 16px",maxWidth:1200,margin:"0 auto"}}>
@@ -3012,39 +2976,32 @@ function CRM({showToast}) {
         </div>
       </div>
 
-      {/* FORMULAIRE RAPIDE */}
+      {/* AJOUT RAPIDE */}
       {showQuick&&(
         <div style={{background:"rgba(10,132,255,0.08)",border:"1px solid rgba(10,132,255,0.25)",borderRadius:14,padding:16,marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0A84FF",marginBottom:12}}>⚡ Ajout rapide — 3 champs seulement</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#0A84FF",marginBottom:12}}>⚡ Ajout rapide</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:10,alignItems:"end"}}>
             <div>
-              <label style={{display:"block",fontSize:11,fontWeight:600,color:theme.textMuted,marginBottom:4}}>Nom</label>
-              <input style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:9,padding:"9px 12px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}
-                value={quickForm.nom} onChange={e=>setQuickForm(f=>({...f,nom:e.target.value}))} placeholder="Ex: Mamadou"/>
+              <label style={lbl}>Nom</label>
+              <input style={inp} value={quickForm.nom} onChange={e=>setQuickForm(f=>({...f,nom:e.target.value}))} placeholder="Ex: Mamadou"/>
             </div>
             <div>
-              <label style={{display:"block",fontSize:11,fontWeight:600,color:theme.textMuted,marginBottom:4}}>Téléphone</label>
-              <input style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:9,padding:"9px 12px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}
-                value={quickForm.telephone} onChange={e=>setQuickForm(f=>({...f,telephone:e.target.value}))} placeholder="+221 XX XXX XX XX"/>
+              <label style={lbl}>Téléphone</label>
+              <input style={inp} value={quickForm.telephone} onChange={e=>setQuickForm(f=>({...f,telephone:e.target.value}))} placeholder="+221 XX XXX XX XX"/>
             </div>
             <div>
-              <label style={{display:"block",fontSize:11,fontWeight:600,color:theme.textMuted,marginBottom:4}}>Produit</label>
-              <select style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:9,padding:"9px 12px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}
-                value={quickForm.produit} onChange={e=>setQuickForm(f=>({...f,produit:e.target.value}))}>
+              <label style={lbl}>Produit</label>
+              <select style={inp} value={quickForm.produit} onChange={e=>setQuickForm(f=>({...f,produit:e.target.value}))}>
                 {PRODUITS.map(p=><option key={p}>{p}</option>)}
               </select>
             </div>
             <button onClick={async()=>{
               if(!quickForm.nom||!quickForm.telephone) return showToast("Nom et téléphone obligatoires");
-              const data={...quickForm,ville:"Dakar",budget:"",statut:"Nouveau",created_at:new Date().toISOString(),historique:JSON.stringify([{date:new Date().toLocaleDateString("fr-FR"),action:"Créé",note:"Ajout rapide"}])};
-              try{
-                const r=await fetch(`${SURL}/rest/v1/prospects`,{method:"POST",headers:H,body:JSON.stringify(data)});
-                if(r.ok){const [p]=await r.json();setProspects(prev=>[p,...prev]);}
-              }catch{setProspects(prev=>[{...data,id:Date.now()},...prev]);}
+              const data={...quickForm,ville:"Dakar",budget:"",statut:"Nouveau",notes:"",created_at:new Date().toISOString(),historique:JSON.stringify([{date:new Date().toLocaleDateString("fr-FR"),action:"Créé",note:"Ajout rapide"}])};
+              try{const r=await fetch(`${SURL}/rest/v1/prospects`,{method:"POST",headers:H,body:JSON.stringify(data)});if(r.ok){const [p]=await r.json();setProspects(prev=>[p,...prev]);}}catch{setProspects(prev=>[{...data,id:Date.now()},...prev]);}
               setQuickForm({nom:"",telephone:"",produit:"iPhone",source:"WhatsApp"});
-              setShowQuick(false);
-              showToast("✅ Prospect ajouté !");
-            }} style={{padding:"9px 18px",borderRadius:9,background:"#0A84FF",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:13,whiteSpace:"nowrap"}}>
+              setShowQuick(false); showToast("✅ Prospect ajouté !");
+            }} style={{padding:"10px 18px",borderRadius:9,background:"#0A84FF",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:13}}>
               ✅ Ajouter
             </button>
           </div>
@@ -3054,81 +3011,49 @@ function CRM({showToast}) {
       {/* IMPORT EN MASSE */}
       {showBulk&&(
         <div style={{background:"rgba(191,90,242,0.08)",border:"1px solid rgba(191,90,242,0.25)",borderRadius:14,padding:16,marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#BF5AF2",marginBottom:4}}>📥 Import en masse depuis WhatsApp</div>
-          <div style={{fontSize:12,color:theme.textMuted,marginBottom:12,lineHeight:1.6}}>
-            Collez vos contacts ici — un par ligne. Format accepté :<br/>
-            <code style={{background:theme.toggleBg,padding:"2px 6px",borderRadius:4,fontSize:11}}>Mamadou Diallo +221 77 123 45 67</code> ou juste <code style={{background:theme.toggleBg,padding:"2px 6px",borderRadius:4,fontSize:11}}>+221 77 123 45 67</code>
-          </div>
-          <textarea
-            value={bulkText}
-            onChange={e=>{setBulkText(e.target.value);parseBulk(e.target.value);}}
-            placeholder={"Mamadou Diallo +221 77 123 45 67\nFatou Sow 78 456 78 90\nAstou +221 76 234 56 78\n..."}
-            style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"12px 14px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box",minHeight:150,resize:"vertical",lineHeight:1.8}}
-          />
-
-          {/* Aperçu des prospects parsés */}
+          <div style={{fontSize:13,fontWeight:700,color:"#BF5AF2",marginBottom:8}}>📥 Import en masse depuis WhatsApp</div>
+          <div style={{fontSize:12,color:theme.textMuted,marginBottom:10}}>Un contact par ligne : Mamadou +221 77 123 45 67</div>
+          <textarea value={bulkText} onChange={e=>{setBulkText(e.target.value);parseBulk(e.target.value);}}
+            placeholder={"Mamadou Diallo +221 77 123 45 67\nFatou 78 456 78 90\n..."}
+            style={{...inp,minHeight:120,resize:"vertical",lineHeight:1.8}}/>
           {bulkParsed.length>0&&(
-            <div style={{marginTop:12,marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:700,color:theme.textMuted,marginBottom:8}}>
-                ✅ {bulkParsed.length} prospect{bulkParsed.length>1?"s":""} détecté{bulkParsed.length>1?"s":""} — aperçu :
-              </div>
-              <div style={{maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
-                {bulkParsed.slice(0,10).map((p,i)=>(
-                  <div key={i} style={{display:"flex",gap:10,alignItems:"center",background:theme.toggleBg,borderRadius:8,padding:"7px 12px",border:`1px solid ${theme.border}`}}>
-                    <span style={{fontSize:14}}>📱</span>
-                    <div style={{flex:1}}>
-                      <span style={{fontWeight:600,fontSize:13}}>{p.nom}</span>
-                      <span style={{color:theme.textMuted,fontSize:12,marginLeft:8}}>{p.telephone}</span>
-                    </div>
-                    <select value={p.produit} onChange={e=>{const np=[...bulkParsed];np[i]={...np[i],produit:e.target.value};setBulkParsed(np);}}
-                      style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:7,padding:"3px 8px",color:theme.text,fontSize:11,fontFamily:"inherit",outline:"none"}}>
-                      {PRODUITS.map(pr=><option key={pr}>{pr}</option>)}
-                    </select>
-                  </div>
-                ))}
-                {bulkParsed.length>10&&<div style={{fontSize:12,color:theme.textMuted,textAlign:"center",padding:"6px"}}>... et {bulkParsed.length-10} autres</div>}
-              </div>
-            </div>
+            <div style={{marginTop:10,fontSize:12,color:"#BF5AF2",fontWeight:700}}>{bulkParsed.length} prospects détectés</div>
           )}
-
-          <div style={{display:"flex",gap:10,marginTop:4}}>
+          <div style={{display:"flex",gap:8,marginTop:10}}>
             <button onClick={importerTous} disabled={bulkImporting||bulkParsed.length===0}
-              style={{flex:1,padding:"11px",borderRadius:10,background:bulkParsed.length>0?"#BF5AF2":"rgba(191,90,242,0.3)",color:"#fff",border:"none",fontWeight:700,fontSize:14,cursor:bulkParsed.length>0?"pointer":"default",fontFamily:"inherit"}}>
-              {bulkImporting?`⏳ Import en cours...`:`✅ Importer ${bulkParsed.length} prospect${bulkParsed.length>1?"s":""}`}
+              style={{flex:1,padding:"10px",borderRadius:10,background:bulkParsed.length>0?"#BF5AF2":"rgba(191,90,242,0.3)",color:"#fff",border:"none",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              {bulkImporting?"⏳ Import...":(`✅ Importer ${bulkParsed.length} prospects`)}
             </button>
             <button onClick={()=>{setShowBulk(false);setBulkText("");setBulkParsed([]);}}
-              style={{padding:"11px 20px",borderRadius:10,background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+              style={{padding:"10px 20px",borderRadius:10,background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
               Annuler
             </button>
           </div>
         </div>
       )}
+
+      {/* TEMPLATES WHATSAPP */}
       {showTemplates&&(
         <div style={{background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.25)",borderRadius:14,padding:16,marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#25D366",marginBottom:12}}>💬 Modèles de messages WhatsApp — Copiez et envoyez !</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8,marginBottom:selectedProspectTemplate?12:0}}>
-            {TEMPLATES_WHATSAPP.map((t,i)=>(
-              <button key={i} onClick={()=>setSelectedProspectTemplate(selectedProspectTemplate===i?null:i)}
-                style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${selectedProspectTemplate===i?"#25D366":theme.border}`,background:selectedProspectTemplate===i?"rgba(37,211,102,0.1)":theme.toggleBg,color:selectedProspectTemplate===i?"#25D366":theme.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,textAlign:"left",transition:"all 0.15s"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#25D366",marginBottom:12}}>💬 Modèles de messages WhatsApp</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:8,marginBottom:selTemplate!==null?12:0}}>
+            {TEMPLATES.map((t,i)=>(
+              <button key={i} onClick={()=>setSelTemplate(selTemplate===i?null:i)}
+                style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${selTemplate===i?"#25D366":theme.border}`,background:selTemplate===i?"rgba(37,211,102,0.1)":theme.toggleBg,color:selTemplate===i?"#25D366":theme.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,textAlign:"left"}}>
                 {t.icon} {t.label}
               </button>
             ))}
           </div>
-          {selectedProspectTemplate!==null&&(
-            <div style={{marginTop:12,background:theme.toggleBg,borderRadius:11,padding:14,border:`1px solid ${theme.border}`}}>
-              <div style={{fontSize:12,color:theme.textMuted,marginBottom:8}}>Message prêt à envoyer :</div>
-              <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:theme.text,marginBottom:10}}>
-                {TEMPLATES_WHATSAPP[selectedProspectTemplate].message(null)}
-              </div>
+          {selTemplate!==null&&(
+            <div style={{background:theme.toggleBg,borderRadius:11,padding:14,border:`1px solid ${theme.border}`}}>
+              <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:theme.text,marginBottom:10}}>{TEMPLATES[selTemplate].msg(null)}</div>
               <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{
-                  navigator.clipboard.writeText(TEMPLATES_WHATSAPP[selectedProspectTemplate].message(null));
-                  showToast("✅ Message copié !");
-                }} style={{padding:"8px 16px",borderRadius:9,background:"#25D366",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                <button onClick={()=>{navigator.clipboard.writeText(TEMPLATES[selTemplate].msg(null));showToast("✅ Copié !");}}
+                  style={{padding:"8px 16px",borderRadius:9,background:"#25D366",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
                   📋 Copier
                 </button>
-                <a href={`https://wa.me/?text=${encodeURIComponent(TEMPLATES_WHATSAPP[selectedProspectTemplate].message(null))}`} target="_blank" rel="noreferrer"
-                  style={{padding:"8px 16px",borderRadius:9,background:"rgba(37,211,102,0.15)",color:"#25D366",border:"1px solid rgba(37,211,102,0.3)",fontWeight:700,fontSize:12,textDecoration:"none",display:"inline-block"}}>
+                <a href={`https://wa.me/?text=${encodeURIComponent(TEMPLATES[selTemplate].msg(null))}`} target="_blank" rel="noreferrer"
+                  style={{padding:"8px 16px",borderRadius:9,background:"rgba(37,211,102,0.15)",color:"#25D366",border:"1px solid rgba(37,211,102,0.3)",fontWeight:700,fontSize:12,textDecoration:"none"}}>
                   📲 Ouvrir WhatsApp
                 </a>
               </div>
@@ -3137,18 +3062,17 @@ function CRM({showToast}) {
         </div>
       )}
 
-      {/* STATS RAPIDES */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:18}}>
+      {/* STATS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10,marginBottom:18}}>
         {[
-          {label:"Total",value:total,color:"#0A84FF",icon:"👥",click:()=>setFiltre("tous")},
-          {label:"Nouveaux",value:prospects.filter(p=>p.statut==="Nouveau").length,color:"#0A84FF",icon:"🆕",click:()=>setFiltre("Nouveau")},
-          {label:"En cours",value:prospects.filter(p=>["En discussion","Devis envoyé"].includes(p.statut)).length,color:"#FF9F0A",icon:"💬",click:()=>setFiltre("En discussion")},
-          {label:"Vendus",value:vendus,color:"#30D158",icon:"✅",click:()=>setFiltre("Vendu")},
-          {label:"Taux conv.",value:tauxConv+"%",color:"#BF5AF2",icon:"📈",click:()=>setVue("stats")},
-          {label:"Relances",value:relances.length,color:"#FF453A",icon:"🔔",click:()=>setFiltre("relances")},
+          {label:"Total",value:total,color:"#0A84FF",icon:"👥",f:()=>setFiltre("tous")},
+          {label:"Nouveaux",value:prospects.filter(p=>p.statut==="Nouveau").length,color:"#0A84FF",icon:"🆕",f:()=>setFiltre("Nouveau")},
+          {label:"En cours",value:prospects.filter(p=>["En discussion","Devis envoyé"].includes(p.statut)).length,color:"#FF9F0A",icon:"💬",f:()=>setFiltre("En discussion")},
+          {label:"Vendus",value:vendus,color:"#30D158",icon:"✅",f:()=>setFiltre("Vendu")},
+          {label:"Conv. %",value:tauxConv+"%",color:"#BF5AF2",icon:"📈",f:()=>setVue("stats")},
+          {label:"Relances",value:relances.length,color:"#FF453A",icon:"🔔",f:()=>setFiltre("relances")},
         ].map(s=>(
-          <div key={s.label} onClick={s.click}
-            style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:14,padding:"13px 14px",cursor:"pointer",transition:"all 0.15s"}}>
+          <div key={s.label} onClick={s.f} style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:14,padding:"13px 14px",cursor:"pointer"}}>
             <div style={{fontSize:18,marginBottom:4}}>{s.icon}</div>
             <div style={{fontSize:22,fontWeight:800,color:s.color}}>{s.value}</div>
             <div style={{fontSize:11,color:theme.textMuted,marginTop:2}}>{s.label}</div>
@@ -3161,24 +3085,21 @@ function CRM({showToast}) {
         <div onClick={()=>setFiltre("relances")} style={{background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",borderRadius:12,padding:"11px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:12,cursor:"pointer",flexWrap:"wrap"}}>
           <span style={{fontSize:20}}>🔔</span>
           <div style={{flex:1}}>
-            <div style={{fontWeight:700,color:"#FF453A",fontSize:13}}>{relances.length} relance{relances.length>1?"s":""} à faire aujourd'hui !</div>
-            <div style={{fontSize:11,color:theme.textMuted}}>{relances.slice(0,3).map(r=>r.nom).join(", ")}{relances.length>3?"...":""}</div>
+            <div style={{fontWeight:700,color:"#FF453A",fontSize:13}}>{relances.length} relance{relances.length>1?"s":""} à faire !</div>
+            <div style={{fontSize:11,color:theme.textMuted}}>{relances.slice(0,3).map(r=>r.nom).join(", ")}</div>
           </div>
-          <span style={{fontSize:12,color:"#FF453A",fontWeight:700}}>Voir →</span>
         </div>
       )}
 
       {/* VUES + FILTRES */}
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-        {/* Toggle vue */}
         <div style={{display:"flex",gap:4,background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:4}}>
-          {[["liste","📋 Liste"],["kanban","🗂 Kanban"],["stats","📊 Stats"]].map(([id,lbl2])=>(
-            <button key={id} onClick={()=>setVue(id)} style={{padding:"6px 14px",borderRadius:8,border:"none",background:vue===id?"#0A84FF":"transparent",color:vue===id?"#fff":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s"}}>
-              {lbl2}
+          {[["liste","📋 Liste"],["kanban","🗂 Kanban"],["stats","📊 Stats"]].map(([id,l])=>(
+            <button key={id} onClick={()=>setVue(id)} style={{padding:"6px 14px",borderRadius:8,border:"none",background:vue===id?"#0A84FF":"transparent",color:vue===id?"#fff":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+              {l}
             </button>
           ))}
         </div>
-
         {vue!=="stats"&&(
           <>
             <input value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="🔍 Rechercher..."
@@ -3194,7 +3115,7 @@ function CRM({showToast}) {
         )}
       </div>
 
-      {/* ═══ VUE LISTE ═══ */}
+      {/* VUE LISTE */}
       {vue==="liste"&&(
         loading?<div style={{textAlign:"center",padding:"3rem",color:theme.textMuted}}>⏳ Chargement...</div>:
         filtres.length===0?<div style={{textAlign:"center",padding:"3rem",color:theme.textMuted}}><div style={{fontSize:48,marginBottom:10}}>🎯</div><div style={{fontWeight:600}}>Aucun prospect</div></div>:
@@ -3204,21 +3125,20 @@ function CRM({showToast}) {
             const rd=relances.find(r=>r.id===p.id);
             return (
               <div key={p.id} onClick={()=>{setModal(p);setNoteInput("");}}
-                style={{background:theme.card,border:`1px solid ${rd?"rgba(255,69,58,0.5)":theme.border}`,borderRadius:14,padding:"14px 16px",cursor:"pointer",transition:"all 0.15s",display:"grid",gridTemplateColumns:"auto 1fr auto",gap:14,alignItems:"center"}}>
-                <div style={{width:46,height:46,borderRadius:12,background:sc.bg,border:`1px solid ${sc.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                  {PRODUIT_ICON[p.produit]||"📦"}
-                </div>
-                <div style={{minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:15,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                    {p.nom}
-                    {rd&&<span style={{fontSize:10,background:"rgba(255,69,58,0.15)",color:"#FF453A",border:"1px solid rgba(255,69,58,0.3)",borderRadius:99,padding:"2px 7px"}}>🔔 Relance</span>}
-                  </div>
-                  <div style={{fontSize:12,color:theme.textMuted,marginTop:3,display:"flex",gap:10,flexWrap:"wrap"}}>
-                    <span>📞 {p.telephone}</span>
-                    {p.ville&&<span>📍 {p.ville}</span>}
-                    {p.budget&&<span>💰 {p.budget}</span>}
-                    <span>📡 {p.source}</span>
-                    <span>🕐 {new Date(p.created_at).toLocaleDateString("fr-FR")}</span>
+                style={{background:theme.card,border:`1px solid ${rd?"rgba(255,69,58,0.5)":theme.border}`,borderRadius:14,padding:"14px 16px",cursor:"pointer",display:"flex",gap:12,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
+                <div style={{display:"flex",gap:12,alignItems:"center",flex:1,minWidth:0}}>
+                  <div style={{width:42,height:42,borderRadius:12,background:sc.bg,border:`1px solid ${sc.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{PI[p.produit]||"📦"}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:15,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                      {p.nom}
+                      {rd&&<span style={{fontSize:10,background:"rgba(255,69,58,0.15)",color:"#FF453A",border:"1px solid rgba(255,69,58,0.3)",borderRadius:99,padding:"2px 7px"}}>🔔 Relance</span>}
+                    </div>
+                    <div style={{fontSize:12,color:theme.textMuted,marginTop:3,display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <span>📞 {p.telephone}</span>
+                      {p.ville&&<span>📍 {p.ville}</span>}
+                      {p.budget&&<span>💰 {p.budget}</span>}
+                      <span>📡 {p.source}</span>
+                    </div>
                   </div>
                 </div>
                 <span style={{fontSize:12,fontWeight:700,padding:"5px 12px",borderRadius:99,...sc,flexShrink:0}}>{sc.icon} {p.statut}</span>
@@ -3228,73 +3148,53 @@ function CRM({showToast}) {
         </div>
       )}
 
-      {/* ═══ VUE KANBAN ═══ */}
+      {/* VUE KANBAN */}
       {vue==="kanban"&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(180px,1fr))",gap:12,overflowX:"auto"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(160px,1fr))",gap:12,overflowX:"auto"}}>
           {STATUTS.map(statut=>{
             const sc=SC[statut];
-            const colProspects=prospects.filter(p=>p.statut===statut&&(!recherche||p.nom?.toLowerCase().includes(recherche.toLowerCase())));
+            const col=prospects.filter(p=>p.statut===statut&&(!recherche||p.nom?.toLowerCase().includes(recherche.toLowerCase())));
             return (
               <div key={statut}
                 onDragOver={e=>{e.preventDefault();setDragOver(statut);}}
                 onDragLeave={()=>setDragOver(null)}
-                onDrop={e=>{
-                  e.preventDefault();
-                  const id=Number(e.dataTransfer.getData("prospectId"));
-                  if(id) majStatut(id,statut);
-                  setDragOver(null);
-                }}
-                style={{background:dragOver===statut?sc.bg:theme.card,border:`2px solid ${dragOver===statut?sc.border:theme.border}`,borderRadius:14,padding:12,minHeight:200,transition:"all 0.2s"}}>
-                {/* Header colonne */}
+                onDrop={e=>{e.preventDefault();const id=Number(e.dataTransfer.getData("pid"));if(id)majStatut(id,statut);setDragOver(null);}}
+                style={{background:dragOver===statut?sc.bg:theme.card,border:`2px solid ${dragOver===statut?sc.border:theme.border}`,borderRadius:14,padding:12,minHeight:200}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                   <div style={{fontWeight:700,fontSize:12,color:sc.color}}>{sc.icon} {statut}</div>
-                  <span style={{fontSize:11,background:sc.bg,color:sc.color,border:`1px solid ${sc.border}`,borderRadius:99,padding:"2px 8px",fontWeight:700}}>{colProspects.length}</span>
+                  <span style={{fontSize:11,background:sc.bg,color:sc.color,border:`1px solid ${sc.border}`,borderRadius:99,padding:"2px 8px",fontWeight:700}}>{col.length}</span>
                 </div>
-                {/* Cartes */}
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {colProspects.map(p=>(
-                    <div key={p.id}
-                      draggable
-                      onDragStart={e=>e.dataTransfer.setData("prospectId",p.id)}
-                      onClick={()=>{setModal(p);setNoteInput("");}}
-                      style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"10px 12px",cursor:"grab",transition:"all 0.15s"}}>
-                      <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{p.nom}</div>
-                      <div style={{fontSize:11,color:theme.textMuted,marginBottom:3}}>📞 {p.telephone}</div>
-                      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>
-                        <span style={{fontSize:10,background:theme.card,border:`1px solid ${theme.border}`,borderRadius:99,padding:"2px 7px",color:theme.textMuted}}>{PRODUIT_ICON[p.produit]} {p.produit}</span>
-                        {p.budget&&<span style={{fontSize:10,background:"rgba(48,209,88,0.1)",border:"1px solid rgba(48,209,88,0.2)",borderRadius:99,padding:"2px 7px",color:"#30D158"}}>{p.budget}</span>}
-                      </div>
-                    </div>
-                  ))}
-                  {colProspects.length===0&&(
-                    <div style={{textAlign:"center",padding:"20px 8px",color:theme.textMuted,fontSize:11}}>Glissez un prospect ici</div>
-                  )}
-                </div>
+                {col.map(p=>(
+                  <div key={p.id} draggable onDragStart={e=>e.dataTransfer.setData("pid",p.id)}
+                    onClick={()=>{setModal(p);setNoteInput("");}}
+                    style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"10px 12px",cursor:"grab",marginBottom:7}}>
+                    <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>{p.nom}</div>
+                    <div style={{fontSize:11,color:theme.textMuted}}>{p.telephone}</div>
+                    <div style={{fontSize:10,marginTop:4,color:sc.color,fontWeight:600}}>{PI[p.produit]} {p.produit}</div>
+                  </div>
+                ))}
+                {col.length===0&&<div style={{textAlign:"center",padding:"16px 8px",color:theme.textMuted,fontSize:11}}>Glissez ici</div>}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* ═══ VUE STATS ═══ */}
+      {/* VUE STATS */}
       {vue==="stats"&&(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-          {/* Taux de conversion */}
           <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:20}}>
-            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase",letterSpacing:"0.06em"}}>Taux de conversion</div>
+            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase"}}>Taux de conversion</div>
             <div style={{textAlign:"center",padding:"20px 0"}}>
               <div style={{fontSize:60,fontWeight:900,color:"#30D158"}}>{tauxConv}%</div>
-              <div style={{fontSize:14,color:theme.textMuted,marginTop:8}}>{vendus} vendu{vendus>1?"s":""} sur {total} prospect{total>1?"s":""}</div>
+              <div style={{fontSize:13,color:theme.textMuted,marginTop:8}}>{vendus} vendu{vendus>1?"s":""} sur {total} prospect{total>1?"s":""}</div>
             </div>
-            {/* Barre progression */}
-            <div style={{height:10,background:theme.toggleBg,borderRadius:99,overflow:"hidden",marginTop:8}}>
-              <div style={{height:"100%",width:`${tauxConv}%`,background:"linear-gradient(90deg,#30D158,#00FF88)",borderRadius:99,transition:"width 1s"}}/>
+            <div style={{height:10,background:theme.toggleBg,borderRadius:99,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${tauxConv}%`,background:"#30D158",borderRadius:99}}/>
             </div>
           </div>
-
-          {/* Pipeline */}
           <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:20}}>
-            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase",letterSpacing:"0.06em"}}>Pipeline</div>
+            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase"}}>Pipeline</div>
             {STATUTS.map(s=>{
               const n=prospects.filter(p=>p.statut===s).length;
               const pct=total>0?Math.round((n/total)*100):0;
@@ -3303,25 +3203,23 @@ function CRM({showToast}) {
                 <div key={s} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                     <span style={{fontSize:12,fontWeight:600,color:sc.color}}>{sc.icon} {s}</span>
-                    <span style={{fontSize:12,fontWeight:700,color:theme.text}}>{n} ({pct}%)</span>
+                    <span style={{fontSize:12,fontWeight:700}}>{n} ({pct}%)</span>
                   </div>
                   <div style={{height:7,background:theme.toggleBg,borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${pct}%`,background:sc.color,borderRadius:99,transition:"width 0.8s"}}/>
+                    <div style={{height:"100%",width:`${pct}%`,background:sc.color,borderRadius:99}}/>
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Par source */}
           <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:20}}>
-            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase",letterSpacing:"0.06em"}}>Sources des prospects</div>
+            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase"}}>Sources</div>
             {Object.entries(parSource).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]).map(([s,n])=>{
               const pct=total>0?Math.round((n/total)*100):0;
               return (
                 <div key={s} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                    <span style={{fontSize:12,fontWeight:600,color:theme.text}}>{s}</span>
+                    <span style={{fontSize:12,fontWeight:600}}>{s}</span>
                     <span style={{fontSize:12,fontWeight:700,color:"#0A84FF"}}>{n} ({pct}%)</span>
                   </div>
                   <div style={{height:7,background:theme.toggleBg,borderRadius:99,overflow:"hidden"}}>
@@ -3331,21 +3229,19 @@ function CRM({showToast}) {
               );
             })}
             {meilleurSource&&meilleurSource[1]>0&&(
-              <div style={{marginTop:12,padding:"10px 12px",background:"rgba(10,132,255,0.1)",border:"1px solid rgba(10,132,255,0.25)",borderRadius:10,fontSize:12,color:"#0A84FF"}}>
-                🏆 Meilleure source : <strong>{meilleurSource[0]}</strong> ({meilleurSource[1]} prospects)
+              <div style={{marginTop:10,padding:"10px 12px",background:"rgba(10,132,255,0.1)",border:"1px solid rgba(10,132,255,0.25)",borderRadius:10,fontSize:12,color:"#0A84FF"}}>
+                🏆 Meilleure : <strong>{meilleurSource[0]}</strong> ({meilleurSource[1]} prospects)
               </div>
             )}
           </div>
-
-          {/* Par produit */}
           <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:20}}>
-            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase",letterSpacing:"0.06em"}}>Produits demandés</div>
+            <div style={{fontSize:13,fontWeight:700,color:theme.textMuted,marginBottom:16,textTransform:"uppercase"}}>Produits demandés</div>
             {Object.entries(parProduit).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]).map(([p,n])=>{
               const pct=total>0?Math.round((n/total)*100):0;
               return (
                 <div key={p} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                    <span style={{fontSize:12,fontWeight:600,color:theme.text}}>{PRODUIT_ICON[p]} {p}</span>
+                    <span style={{fontSize:12,fontWeight:600}}>{PI[p]} {p}</span>
                     <span style={{fontSize:12,fontWeight:700,color:"#BF5AF2"}}>{n} ({pct}%)</span>
                   </div>
                   <div style={{height:7,background:theme.toggleBg,borderRadius:99,overflow:"hidden"}}>
@@ -3364,14 +3260,14 @@ function CRM({showToast}) {
           <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${theme.border}`}}>
             <div style={{fontWeight:800,fontSize:18,marginBottom:18}}>+ Nouveau prospect</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Nom complet *</label><input style={inp} value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Ex: Mamadou Diallo"/></div>
+              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Nom complet *</label><input style={inp} value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Mamadou Diallo"/></div>
               <div><label style={lbl}>Téléphone *</label><input style={inp} value={form.telephone} onChange={e=>setForm(f=>({...f,telephone:e.target.value}))} placeholder="+221 XX XXX XX XX"/></div>
               <div><label style={lbl}>Ville</label><input style={inp} value={form.ville} onChange={e=>setForm(f=>({...f,ville:e.target.value}))}/></div>
-              <div><label style={lbl}>Produit recherché</label><select style={inp} value={form.produit} onChange={e=>setForm(f=>({...f,produit:e.target.value}))}>{PRODUITS.map(p=><option key={p}>{p}</option>)}</select></div>
-              <div><label style={lbl}>Budget estimé</label><input style={inp} value={form.budget} onChange={e=>setForm(f=>({...f,budget:e.target.value}))} placeholder="Ex: 400 000 FCFA"/></div>
+              <div><label style={lbl}>Produit</label><select style={inp} value={form.produit} onChange={e=>setForm(f=>({...f,produit:e.target.value}))}>{PRODUITS.map(p=><option key={p}>{p}</option>)}</select></div>
+              <div><label style={lbl}>Budget</label><input style={inp} value={form.budget} onChange={e=>setForm(f=>({...f,budget:e.target.value}))} placeholder="Ex: 400 000 FCFA"/></div>
               <div><label style={lbl}>Source</label><select style={inp} value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))}>{SOURCES.map(s=><option key={s}>{s}</option>)}</select></div>
-              <div><label style={lbl}>Statut initial</label><select style={inp} value={form.statut} onChange={e=>setForm(f=>({...f,statut:e.target.value}))}>{STATUTS.map(s=><option key={s}>{s}</option>)}</select></div>
-              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Notes</label><textarea style={{...inp,resize:"vertical",minHeight:65}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Détails sur le prospect..."/></div>
+              <div><label style={lbl}>Statut</label><select style={inp} value={form.statut} onChange={e=>setForm(f=>({...f,statut:e.target.value}))}>{STATUTS.map(s=><option key={s}>{s}</option>)}</select></div>
+              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Notes</label><textarea style={{...inp,resize:"vertical",minHeight:65}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Détails..."/></div>
             </div>
             <div style={{display:"flex",gap:10}}>
               <button onClick={ajouter} disabled={saving} style={{flex:1,background:"#0A84FF",color:"#fff",border:"none",padding:"12px",borderRadius:12,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>{saving?"⏳...":"✅ Enregistrer"}</button>
@@ -3395,17 +3291,14 @@ function CRM({showToast}) {
                 </div>
                 <button onClick={()=>setModal(null)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:theme.textMuted}}>✕</button>
               </div>
-
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
-                {[["Produit",`${PRODUIT_ICON[modal.produit]||"📦"} ${modal.produit}`],["Budget",modal.budget||"—"],["Source",modal.source],["Ajouté",new Date(modal.created_at).toLocaleDateString("fr-FR")]].map(([k,v])=>(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+                {[["Produit",`${PI[modal.produit]||"📦"} ${modal.produit}`],["Budget",modal.budget||"—"],["Source",modal.source],["Ajouté",new Date(modal.created_at).toLocaleDateString("fr-FR")]].map(([k,v])=>(
                   <div key={k} style={{background:theme.toggleBg,borderRadius:10,padding:"10px 12px"}}>
                     <div style={{fontSize:11,color:theme.textMuted}}>{k}</div>
                     <div style={{fontWeight:700,fontSize:13,marginTop:2}}>{v}</div>
                   </div>
                 ))}
               </div>
-
-              {/* Statut */}
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>Statut</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -3416,8 +3309,6 @@ function CRM({showToast}) {
                   );})}
                 </div>
               </div>
-
-              {/* Relances */}
               <div style={{marginBottom:14,background:"rgba(10,132,255,0.08)",border:"1px solid rgba(10,132,255,0.2)",borderRadius:12,padding:"12px 14px"}}>
                 <div style={{fontSize:11,fontWeight:700,color:"#0A84FF",marginBottom:8,textTransform:"uppercase"}}>🔔 Programmer une relance</div>
                 <div style={{display:"flex",gap:8}}>
@@ -3435,8 +3326,6 @@ function CRM({showToast}) {
                 </div>
                 {modal.prochaine_relance&&<div style={{fontSize:11,color:theme.textMuted,marginTop:6}}>📅 Prochaine : {new Date(modal.prochaine_relance).toLocaleDateString("fr-FR")}</div>}
               </div>
-
-              {/* Note */}
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>Ajouter une note</div>
                 <div style={{display:"flex",gap:8}}>
@@ -3445,14 +3334,12 @@ function CRM({showToast}) {
                   <button onClick={()=>ajouterNote(modal)} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 14px",borderRadius:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>+</button>
                 </div>
               </div>
-
-              {/* Historique */}
               {hist.length>0&&(
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>Historique</div>
                   {[...hist].reverse().map((h,i)=>(
                     <div key={i} style={{background:theme.toggleBg,borderRadius:9,padding:"8px 12px",marginBottom:5,display:"flex",gap:10}}>
-                      <div style={{fontSize:10,color:theme.textMuted,flexShrink:0,paddingTop:1}}>{h.date}</div>
+                      <div style={{fontSize:10,color:theme.textMuted,flexShrink:0}}>{h.date}</div>
                       <div>
                         <div style={{fontSize:11,fontWeight:700,color:"#0A84FF"}}>{h.action}</div>
                         {h.note&&<div style={{fontSize:12,color:theme.text,marginTop:1}}>{h.note}</div>}
@@ -3461,7 +3348,20 @@ function CRM({showToast}) {
                   ))}
                 </div>
               )}
-
+              {/* Messages WhatsApp rapides */}
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>📲 Messages rapides WhatsApp</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {TEMPLATES.map((t,i)=>(
+                    <button key={i} onClick={()=>{
+                      const url=`https://wa.me/${modal.telephone?.replace(/[\s+]/g,"")}?text=${encodeURIComponent(t.msg(modal))}`;
+                      window.open(url,"_blank");
+                    }} style={{padding:"9px 12px",borderRadius:10,background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.2)",color:"#25D366",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,textAlign:"left"}}>
+                      {t.icon} {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <a href={`https://wa.me/${modal.telephone?.replace(/[\s+]/g,"")}`} target="_blank" rel="noreferrer"
                   style={{display:"block",textAlign:"center",background:"rgba(37,211,102,0.12)",border:"1px solid rgba(37,211,102,0.3)",color:"#25D366",padding:"11px",borderRadius:12,fontWeight:700,fontSize:14,textDecoration:"none"}}>
@@ -3471,22 +3371,6 @@ function CRM({showToast}) {
                   🗑 Supprimer
                 </button>
               </div>
-
-              {/* TEMPLATES WHATSAPP DANS LA FICHE */}
-              <div style={{marginTop:14}}>
-                <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>📲 Messages rapides WhatsApp</div>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {TEMPLATES_WHATSAPP.map((t,i)=>(
-                    <button key={i} onClick={()=>{
-                      const msg = t.message(modal);
-                      const url = `https://wa.me/${modal.telephone?.replace(/[\s+]/g,"")}?text=${encodeURIComponent(msg)}`;
-                      window.open(url,"_blank");
-                    }} style={{padding:"9px 12px",borderRadius:10,background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.2)",color:"#25D366",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,textAlign:"left",display:"flex",gap:8,alignItems:"center"}}>
-                      <span>{t.icon}</span>{t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         );
@@ -3494,6 +3378,7 @@ function CRM({showToast}) {
     </div>
   );
 }
+
 
 // ─── CATALOGUE DES PRIX ────────────────────────────────────────────────────────
 function Catalogue({showToast}) {
