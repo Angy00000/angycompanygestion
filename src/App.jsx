@@ -47,7 +47,7 @@ const syncAngyQueue = async () => {
 
 // ─── Fonctions DB avec fallback offline ───────────────────────────────────────
 const dbGet = async (t) => {
-  const r = await fetch(`${SUPA_URL}/rest/v1/${t}?order=id.desc`,{headers:dbHeaders});
+  const r = await fetch(`${SUPA_URL}/rest/v1/${t}?order=created_at.desc`,{headers:dbHeaders});
   if(!r.ok){ const err = await r.text(); console.error(`dbGet ${t} error:`,r.status,err); return []; }
   return r.json();
 };
