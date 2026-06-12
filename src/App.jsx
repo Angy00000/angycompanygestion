@@ -2560,18 +2560,9 @@ export default function App() {
 
   const showToast=(msg,err=false)=>{setToast({msg,err});setTimeout(()=>setToast(null),3000);};
 
-  // Afficher login si pas de session
-  if(!user) return (
-    <ThemeCtx.Provider value={{dark,toggle:()=>setDark(d=>!d),theme}}>
-      <AngyLogin onLogin={(u)=>setUser(u)}/>
-    </ThemeCtx.Provider>
-  );
-
-  const isAdmin=user?.role==="admin";
-  const isVendeur=user?.role==="vendeur";
-  const isComptable=user?.role==="comptable";
-
+  // ─── Chargement données ── DOIT être avant tout return conditionnel ───────────
   useEffect(()=>{
+    if(!user) return; // Ne charger que si connecté
     // Charger le cache immédiatement pour affichage rapide
     const cache=loadAngyCache();
     if(cache){
@@ -2582,30 +2573,50 @@ export default function App() {
       setClients(cache.clients||[]);
       setDevis(cache.devis||[]);
     }
-    // Puis essayer Supabase
+    // Puis charger depuis Supabase
     (async()=>{
       try{
-        console.log("🔄 Chargement depuis Supabase...");
         const [d,s,v,f,c,dv]=await Promise.all([
-          dbGet("depenses"),dbGet("stock"),
-          dbGet("ventes"),dbGet("factures").catch(()=>[]),
+          dbGet("depenses"),
+          dbGet("stock"),
+          dbGet("ventes"),
+          dbGet("factures").catch(()=>[]),
           dbGet("clients").catch(()=>[]),
           dbGet("devis").catch(()=>[])
         ]);
-        console.log("✅ Données chargées:",{depenses:d?.length,stock:s?.length,ventes:v?.length,factures:f?.length});
-        const data={depenses:d||[],stock:s||[],ventes:v||[],factures:f||[],clients:c||[],devis:dv||[]};
-        setDepenses(data.depenses);setStock(data.stock);
-        setVentes(data.ventes);setFactures(data.factures);
-        setClients(data.clients);setDevis(data.devis);
+        const data={
+          depenses:Array.isArray(d)?d:[],
+          stock:Array.isArray(s)?s:[],
+          ventes:Array.isArray(v)?v:[],
+          factures:Array.isArray(f)?f:[],
+          clients:Array.isArray(c)?c:[],
+          devis:Array.isArray(dv)?dv:[]
+        };
+        setDepenses(data.depenses);
+        setStock(data.stock);
+        setVentes(data.ventes);
+        setFactures(data.factures);
+        setClients(data.clients);
+        setDevis(data.devis);
         saveAngyCache(data);
         setOffline(false);
       }catch(e){
-        console.error("❌ Erreur chargement:",e);
         setOffline(true);
       }
       setLoading(false);
     })();
-  },[]);
+  },[user]);
+
+  // Afficher login si pas de session
+  if(!user) return (
+    <ThemeCtx.Provider value={{dark,toggle:()=>setDark(d=>!d),theme}}>
+      <AngyLogin onLogin={(u)=>setUser(u)}/>
+    </ThemeCtx.Provider>
+  );
+
+  const isAdmin=user?.role==="admin";
+  const isVendeur=user?.role==="vendeur";
+  const isComptable=user?.role==="comptable";
 
   // Sync au retour de connexion
   useEffect(()=>{
