@@ -2824,6 +2824,10 @@ function CRM({showToast}) {
   const [noteInput, setNoteInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(null);
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkParsed, setBulkParsed] = useState([]);
+  const [bulkImporting, setBulkImporting] = useState(false);
   const [quickForm, setQuickForm] = useState({nom:"",telephone:"",produit:"iPhone",source:"WhatsApp"});
   const [showQuick, setShowQuick] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -2924,6 +2928,40 @@ function CRM({showToast}) {
     const a = document.createElement("a"); a.href=url; a.download=`prospects_${new Date().toLocaleDateString("fr-FR").replace(/\//g,"-")}.csv`; a.click();
     showToast("✅ Export CSV téléchargé !");
   };
+    const lines = text.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
+    const parsed = lines.map(line=>{
+      // Cherche un numéro de téléphone dans la ligne
+      const phoneMatch = line.match(/(\+?221[\s\-]?\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\+?7\d[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\d{9,12})/);
+      const phone = phoneMatch ? phoneMatch[0].replace(/[\s\-]/g,"") : "";
+      // Le nom est tout ce qui n'est pas le numéro
+      const nom = line.replace(phoneMatch?phoneMatch[0]:"","").replace(/[,;:|-]/g,"").trim() || "Prospect";
+      return {nom: nom||"Prospect", telephone: phone, produit:"iPhone", source:"WhatsApp", statut:"Nouveau", valide:!!phone};
+    }).filter(p=>p.telephone);
+    setBulkParsed(parsed);
+  };
+
+  const importerTous = async () => {
+    if(bulkParsed.length===0) return showToast("Aucun prospect à importer");
+    setBulkImporting(true);
+    let count = 0;
+    for(const p of bulkParsed) {
+      const data={...p,ville:"Dakar",budget:"",notes:"",created_at:new Date().toISOString(),historique:JSON.stringify([{date:new Date().toLocaleDateString("fr-FR"),action:"Import en masse",note:"Importé depuis WhatsApp"}])};
+      try{
+        const r=await fetch(`${SURL}/rest/v1/prospects`,{method:"POST",headers:H,body:JSON.stringify(data)});
+        if(r.ok){const [newP]=await r.json();setProspects(prev=>[newP,...prev]);count++;}
+      }catch{
+        setProspects(prev=>[{...data,id:Date.now()+count},...prev]);count++;
+      }
+      await new Promise(r=>setTimeout(r,100)); // Petit délai entre chaque
+    }
+    showToast(`✅ ${count} prospects importés !`);
+    setBulkImporting(false);
+    setShowBulk(false);
+    setBulkText("");
+    setBulkParsed([]);
+  };
+
+  const parseBulk = (text) => {
 
   // Relances dues
   const relances = prospects.filter(p=>p.prochaine_relance&&new Date(p.prochaine_relance)<=new Date()&&!["Vendu","Perdu"].includes(p.statut));
@@ -2961,6 +2999,9 @@ function CRM({showToast}) {
           </button>
           <button onClick={exportCSV} style={{background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,padding:"9px 16px",borderRadius:10,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
             📥 Export CSV
+          </button>
+          <button onClick={()=>setShowBulk(!showBulk)} style={{background:"rgba(191,90,242,0.15)",color:"#BF5AF2",border:"1px solid rgba(191,90,242,0.3)",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+            📥 Import en masse
           </button>
           <button onClick={()=>setShowQuick(!showQuick)} style={{background:"rgba(10,132,255,0.15)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
             ⚡ Ajout rapide
@@ -3010,7 +3051,58 @@ function CRM({showToast}) {
         </div>
       )}
 
-      {/* TEMPLATES WHATSAPP */}
+      {/* IMPORT EN MASSE */}
+      {showBulk&&(
+        <div style={{background:"rgba(191,90,242,0.08)",border:"1px solid rgba(191,90,242,0.25)",borderRadius:14,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#BF5AF2",marginBottom:4}}>📥 Import en masse depuis WhatsApp</div>
+          <div style={{fontSize:12,color:theme.textMuted,marginBottom:12,lineHeight:1.6}}>
+            Collez vos contacts ici — un par ligne. Format accepté :<br/>
+            <code style={{background:theme.toggleBg,padding:"2px 6px",borderRadius:4,fontSize:11}}>Mamadou Diallo +221 77 123 45 67</code> ou juste <code style={{background:theme.toggleBg,padding:"2px 6px",borderRadius:4,fontSize:11}}>+221 77 123 45 67</code>
+          </div>
+          <textarea
+            value={bulkText}
+            onChange={e=>{setBulkText(e.target.value);parseBulk(e.target.value);}}
+            placeholder={"Mamadou Diallo +221 77 123 45 67\nFatou Sow 78 456 78 90\nAstou +221 76 234 56 78\n..."}
+            style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"12px 14px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box",minHeight:150,resize:"vertical",lineHeight:1.8}}
+          />
+
+          {/* Aperçu des prospects parsés */}
+          {bulkParsed.length>0&&(
+            <div style={{marginTop:12,marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:700,color:theme.textMuted,marginBottom:8}}>
+                ✅ {bulkParsed.length} prospect{bulkParsed.length>1?"s":""} détecté{bulkParsed.length>1?"s":""} — aperçu :
+              </div>
+              <div style={{maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
+                {bulkParsed.slice(0,10).map((p,i)=>(
+                  <div key={i} style={{display:"flex",gap:10,alignItems:"center",background:theme.toggleBg,borderRadius:8,padding:"7px 12px",border:`1px solid ${theme.border}`}}>
+                    <span style={{fontSize:14}}>📱</span>
+                    <div style={{flex:1}}>
+                      <span style={{fontWeight:600,fontSize:13}}>{p.nom}</span>
+                      <span style={{color:theme.textMuted,fontSize:12,marginLeft:8}}>{p.telephone}</span>
+                    </div>
+                    <select value={p.produit} onChange={e=>{const np=[...bulkParsed];np[i]={...np[i],produit:e.target.value};setBulkParsed(np);}}
+                      style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:7,padding:"3px 8px",color:theme.text,fontSize:11,fontFamily:"inherit",outline:"none"}}>
+                      {PRODUITS.map(pr=><option key={pr}>{pr}</option>)}
+                    </select>
+                  </div>
+                ))}
+                {bulkParsed.length>10&&<div style={{fontSize:12,color:theme.textMuted,textAlign:"center",padding:"6px"}}>... et {bulkParsed.length-10} autres</div>}
+              </div>
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:10,marginTop:4}}>
+            <button onClick={importerTous} disabled={bulkImporting||bulkParsed.length===0}
+              style={{flex:1,padding:"11px",borderRadius:10,background:bulkParsed.length>0?"#BF5AF2":"rgba(191,90,242,0.3)",color:"#fff",border:"none",fontWeight:700,fontSize:14,cursor:bulkParsed.length>0?"pointer":"default",fontFamily:"inherit"}}>
+              {bulkImporting?`⏳ Import en cours...`:`✅ Importer ${bulkParsed.length} prospect${bulkParsed.length>1?"s":""}`}
+            </button>
+            <button onClick={()=>{setShowBulk(false);setBulkText("");setBulkParsed([]);}}
+              style={{padding:"11px 20px",borderRadius:10,background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
       {showTemplates&&(
         <div style={{background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.25)",borderRadius:14,padding:16,marginBottom:16}}>
           <div style={{fontSize:13,fontWeight:700,color:"#25D366",marginBottom:12}}>💬 Modèles de messages WhatsApp — Copiez et envoyez !</div>
