@@ -11,90 +11,35 @@ const dbHeaders = {
   "Prefer": "return=representation",
 };
 
-// ─── Cache & File d'attente offline ──────────────────────────────────────────
-const ANGY_CACHE_KEY = "angy_cache";
-const ANGY_QUEUE_KEY = "angy_queue";
-const loadAngyCache = () => { try { return JSON.parse(localStorage.getItem(ANGY_CACHE_KEY)||"null"); } catch { return null; } };
-const saveAngyCache = (d) => localStorage.setItem(ANGY_CACHE_KEY, JSON.stringify(d));
-
-// Référence globale pour mettre à jour le cache après chaque action
-let _angyState = {depenses:[],stock:[],ventes:[],factures:[],clients:[],devis:[]};
-const updateAngyState = (key, val) => {
-  _angyState = {..._angyState, [key]: val};
-  saveAngyCache(_angyState);
-};
-const loadAngyQueue = () => { try { return JSON.parse(localStorage.getItem(ANGY_QUEUE_KEY)||"[]"); } catch { return []; } };
-const saveAngyQueue = (q) => localStorage.setItem(ANGY_QUEUE_KEY, JSON.stringify(q));
-
-const addToAngyQueue = (action) => {
-  const q = loadAngyQueue();
-  q.push({...action, id: Date.now(), timestamp: new Date().toISOString()});
-  saveAngyQueue(q);
-};
-
-const isOnline = () => navigator.onLine;
-
-const syncAngyQueue = async () => {
-  const q = loadAngyQueue();
-  if(q.length === 0) return;
-  const remaining = [];
-  for(const action of q){
-    try{
-      if(action.type === "ADD"){
-        await fetch(`${SUPA_URL}/rest/v1/${action.table}`,{method:"POST",headers:dbHeaders,body:JSON.stringify(action.data)});
-      } else if(action.type === "DEL"){
-        await fetch(`${SUPA_URL}/rest/v1/${action.table}?id=eq.${action.id}`,{method:"DELETE",headers:dbHeaders});
-      } else if(action.type === "PATCH"){
-        await fetch(`${SUPA_URL}/rest/v1/${action.table}?id=eq.${action.id}`,{method:"PATCH",headers:dbHeaders,body:JSON.stringify(action.data)});
-      }
-    } catch(e){ remaining.push(action); }
-  }
-  saveAngyQueue(remaining);
-};
-
-// ─── Fonctions DB avec fallback offline ───────────────────────────────────────
+// ─── Fonctions DB simples et directes ────────────────────────────────────────
 const dbGet = async (t) => {
-  const r = await fetch(`${SUPA_URL}/rest/v1/${t}?order=created_at.desc`,{headers:dbHeaders});
-  if(!r.ok){ const err = await r.text(); console.error(`dbGet ${t} error:`,r.status,err); return []; }
+  const r = await fetch(`${SUPA_URL}/rest/v1/${t}?order=created_at.desc&limit=1000`,{headers:dbHeaders});
+  if(!r.ok) return [];
   return r.json();
 };
 
 const dbAdd = async (t, d) => {
-  if(isOnline()){
-    try{
-      const r = await fetch(`${SUPA_URL}/rest/v1/${t}`,{method:"POST",headers:dbHeaders,body:JSON.stringify(d)});
-      if(!r.ok){
-        const err = await r.text();
-        console.error("Supabase error:", r.status, err);
-        addToAngyQueue({type:"ADD",table:t,data:d});
-        return [{...d, id: Date.now()}];
-      }
-      const json = await r.json();
-      return Array.isArray(json) ? json : [json];
-    }catch(e){
-      console.error("dbAdd error:", e);
-      addToAngyQueue({type:"ADD",table:t,data:d});
-      return [{...d, id: Date.now()}];
-    }
-  } else {
-    addToAngyQueue({type:"ADD",table:t,data:d});
-    return [{...d, id: Date.now()}];
-  }
+  const r = await fetch(`${SUPA_URL}/rest/v1/${t}`,{method:"POST",headers:dbHeaders,body:JSON.stringify(d)});
+  if(!r.ok){ console.error("dbAdd error:", await r.text()); return [{...d,id:Date.now()}]; }
+  const json = await r.json();
+  return Array.isArray(json) ? json : [json];
 };
 
 const dbDel = async (t, id) => {
-  if(isOnline()){
-    try{ return fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:dbHeaders}); }
-    catch(e){ addToAngyQueue({type:"DEL",table:t,id}); }
-  } else { addToAngyQueue({type:"DEL",table:t,id}); }
+  await fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:dbHeaders});
 };
 
 const dbPatch = async (t, id, d) => {
-  if(isOnline()){
-    try{ return fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:dbHeaders,body:JSON.stringify(d)}); }
-    catch(e){ addToAngyQueue({type:"PATCH",table:t,id,data:d}); }
-  } else { addToAngyQueue({type:"PATCH",table:t,id,data:d}); }
+  await fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:dbHeaders,body:JSON.stringify(d)});
 };
+
+// Fonctions cache vides pour compatibilité
+const loadAngyCache = () => null;
+const saveAngyCache = () => {};
+const updateAngyState = () => {};
+const syncAngyQueue = async () => {};
+const addToAngyQueue = () => {};
+const isOnline = () => true;
 
 // ─── Thème ────────────────────────────────────────────────────────────────────
 const ThemeCtx = createContext();
@@ -2566,52 +2511,25 @@ export default function App() {
 
   const showToast=(msg,err=false)=>{setToast({msg,err});setTimeout(()=>setToast(null),3000);};
 
-  // ─── Chargement données ── DOIT être avant tout return conditionnel ───────────
+  // ─── Chargement données depuis Supabase ──────────────────────────────────────
   useEffect(()=>{
-    if(!user) return; // Ne charger que si connecté
-    // Charger le cache immédiatement pour affichage rapide
-    const cache=loadAngyCache();
-    if(cache){
-      setDepenses(cache.depenses||[]);
-      setStock(cache.stock||[]);
-      setVentes(cache.ventes||[]);
-      setFactures(cache.factures||[]);
-      setClients(cache.clients||[]);
-      setDevis(cache.devis||[]);
-    }
-    // Puis charger depuis Supabase
-    (async()=>{
-      try{
-        const [d,s,v,f,c,dv]=await Promise.all([
-          dbGet("depenses"),
-          dbGet("stock"),
-          dbGet("ventes"),
-          dbGet("factures").catch(()=>[]),
-          dbGet("clients").catch(()=>[]),
-          dbGet("devis").catch(()=>[])
-        ]);
-        const data={
-          depenses:Array.isArray(d)?d:[],
-          stock:Array.isArray(s)?s:[],
-          ventes:Array.isArray(v)?v:[],
-          factures:Array.isArray(f)?f:[],
-          clients:Array.isArray(c)?c:[],
-          devis:Array.isArray(dv)?dv:[]
-        };
-        _angyState = data;
-        setDepenses(data.depenses);
-        setStock(data.stock);
-        setVentes(data.ventes);
-        setFactures(data.factures);
-        setClients(data.clients);
-        setDevis(data.devis);
-        saveAngyCache(data);
-        setOffline(false);
-      }catch(e){
-        setOffline(true);
-      }
-      setLoading(false);
-    })();
+    if(!user) return;
+    setLoading(true);
+    Promise.all([
+      dbGet("depenses"),
+      dbGet("stock"),
+      dbGet("ventes"),
+      dbGet("factures"),
+      dbGet("clients"),
+      dbGet("devis")
+    ]).then(([d,s,v,f,c,dv])=>{
+      setDepenses(Array.isArray(d)?d:[]);
+      setStock(Array.isArray(s)?s:[]);
+      setVentes(Array.isArray(v)?v:[]);
+      setFactures(Array.isArray(f)?f:[]);
+      setClients(Array.isArray(c)?c:[]);
+      setDevis(Array.isArray(dv)?dv:[]);
+    }).catch(()=>{}).finally(()=>setLoading(false));
   },[user]);
 
   // Afficher login si pas de session
