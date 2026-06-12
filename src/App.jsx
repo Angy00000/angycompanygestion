@@ -16,6 +16,13 @@ const ANGY_CACHE_KEY = "angy_cache";
 const ANGY_QUEUE_KEY = "angy_queue";
 const loadAngyCache = () => { try { return JSON.parse(localStorage.getItem(ANGY_CACHE_KEY)||"null"); } catch { return null; } };
 const saveAngyCache = (d) => localStorage.setItem(ANGY_CACHE_KEY, JSON.stringify(d));
+
+// Référence globale pour mettre à jour le cache après chaque action
+let _angyState = {depenses:[],stock:[],ventes:[],factures:[],clients:[],devis:[]};
+const updateAngyState = (key, val) => {
+  _angyState = {..._angyState, [key]: val};
+  saveAngyCache(_angyState);
+};
 const loadAngyQueue = () => { try { return JSON.parse(localStorage.getItem(ANGY_QUEUE_KEY)||"[]"); } catch { return []; } };
 const saveAngyQueue = (q) => localStorage.setItem(ANGY_QUEUE_KEY, JSON.stringify(q));
 
@@ -55,11 +62,10 @@ const dbGet = async (t) => {
 const dbAdd = async (t, d) => {
   if(isOnline()){
     try{
-      const r = await fetch(`${SUPA_URL}/rest/v1/${t}`,{method:"POST",headers:{...dbHeaders,"Prefer":"return=representation"},body:JSON.stringify(d)});
+      const r = await fetch(`${SUPA_URL}/rest/v1/${t}`,{method:"POST",headers:dbHeaders,body:JSON.stringify(d)});
       if(!r.ok){
         const err = await r.text();
         console.error("Supabase error:", r.status, err);
-        // Mode offline fallback
         addToAngyQueue({type:"ADD",table:t,data:d});
         return [{...d, id: Date.now()}];
       }
@@ -655,7 +661,7 @@ function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast,recherch
     setLoading(true);
     try{
       const rows=await dbAdd("depenses",{titre:form.titre,cat:form.cat,montant:parseInt(form.montant),date:form.date,statut:form.statut,note:form.note});
-      setDepenses([rows[0],...depenses]);
+      setDepenses([rows[0],...depenses]);updateAngyState("depenses",[rows[0],...depenses]);
 
       // Ajouter au stock si catégorie produit
       if(isStockCat && ajouterStock && stockForm.qte){
@@ -681,7 +687,7 @@ function Depenses({depenses,setDepenses,catDep,stock,setStock,showToast,recherch
     }catch(e){showToast("Erreur",true);}
     setLoading(false);
   };
-  const del=async(id)=>{await dbDel("depenses",id);setDepenses(depenses.filter(d=>d.id!==id));showToast("Supprimée");};
+  const del=async(id)=>{await dbDel("depenses",id);setDepenses(depenses.filter(d=>d.id!==id));updateAngyState("depenses",depenses.filter(d=>d.id!==id));showToast("Supprimée");};
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
   const chStat=async(id,statut)=>{await dbPatch("depenses",id,{statut});setDepenses(depenses.map(d=>d.id===id?{...d,statut}:d));showToast("Statut mis à jour");};
@@ -831,7 +837,7 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
     setLoading(true);
     try{
       const rows=await dbAdd("stock",{nom:form.nom,cat:form.cat,qte:parseInt(form.qte),prix_achat:parseInt(form.prix_achat),prix_vente:parseInt(form.prix_vente),seuil:parseInt(form.seuil)||0});
-      setStock([rows[0],...stock]);
+      setStock([rows[0],...stock]);updateAngyState("stock",[rows[0],...stock]);
 
       // Créer dépense automatiquement si demandé
       if(ajouterDepense && form.prix_achat){
@@ -859,14 +865,14 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
       await dbPatch("stock",p.id,{qte:p.qte-q});
       const venteRows=await dbAdd("ventes",{produit:p.nom,cat:p.cat,qte:q,prix_vente:p.prix_vente,date:vf.date,client:vf.client||"—"});
       setStock(stock.map(x=>x.id===showVente?{...x,qte:x.qte-q}:x));
-      setVentes([venteRows[0],...ventes]);
+      setVentes([venteRows[0],...ventes]);updateAngyState("ventes",[venteRows[0],...ventes]);
 
       // Créer facture automatiquement si demandé
       if(vf.creerFacture){
         const numero=`FAC-${new Date().getFullYear()}-${String(factures.length+1).padStart(3,"0")}`;
         const lignes=JSON.stringify([{desc:p.nom,cat:p.cat,qte:q,pu:p.prix_vente,details:{}}]);
         const factRows=await dbAdd("factures",{numero,client:vf.client||"—",email:"",telephone:vf.telephone||"",adresse:"",date:vf.date,note:"Merci pour votre confiance",lignes,total:q*p.prix_vente,paiement:vf.paiement||"Espèces"});
-        setFactures([factRows[0],...factures]);
+        setFactures([factRows[0],...factures]);updateAngyState("factures",[factRows[0],...factures]);
         showToast("Vente + Facture créées ✓ — Allez dans 🧾 Factures");
       } else {
         showToast("Vente enregistrée ✓");
@@ -878,7 +884,7 @@ function Stock({stock,setStock,ventes,setVentes,factures,setFactures,depenses,se
     setLoading(false);
   };
 
-  const del=async(id)=>{await dbDel("stock",id);setStock(stock.filter(p=>p.id!==id));showToast("Supprimé");};
+  const del=async(id)=>{await dbDel("stock",id);setStock(stock.filter(p=>p.id!==id));updateAngyState("stock",stock.filter(p=>p.id!==id));showToast("Supprimé");};
   const adj=async(id,delta)=>{const p=stock.find(x=>x.id===id);const nq=Math.max(0,p.qte+delta);await dbPatch("stock",id,{qte:nq});setStock(stock.map(x=>x.id===id?{...x,qte:nq}:x));};
 
   return (
@@ -1137,7 +1143,7 @@ function Factures({factures,setFactures,stock,showToast,clients,rechercheFiltre=
   const del=async(id)=>{
     // Supprimer la facture
     await dbDel("factures",id);
-    setFactures(factures.filter(f=>f.id!==id));
+    setFactures(factures.filter(f=>f.id!==id));updateAngyState("factures",factures.filter(f=>f.id!==id));
     if(preview?.id===id)setPreview(null);
     showToast("Facture supprimée ✓");
   };
@@ -1700,7 +1706,7 @@ function Devis({devis,setDevis,factures,setFactures,stock,clients,showToast}) {
     if(!form.client||lignes.some(l=>!l.desc))return showToast("Client et descriptions requis",true);
     const numero=numDevis();
     const rows=await dbAdd("devis",{numero,client:form.client,telephone:form.telephone,email:form.email,adresse:form.adresse,date:form.date,validite:form.validite,lignes:JSON.stringify(lignes),total:totalLignes,statut:"En attente",note:form.note,paiement:form.paiement});
-    setDevis([rows[0],...devis]);
+    setDevis([rows[0],...devis]);updateAngyState("devis",[rows[0],...devis]);
     setLignes([{desc:"",cat:"iphones",qte:1,pu:0}]);
     setForm({client:"",telephone:"",email:"",adresse:"",date:today(),validite:"",note:"Devis valable 30 jours",paiement:"Espèces"});
     setShow(false);showToast("Devis créé ✓");
@@ -1717,7 +1723,7 @@ function Devis({devis,setDevis,factures,setFactures,stock,clients,showToast}) {
     showToast(`Devis converti en facture ${numero} ✓`);
   };
 
-  const del=async(id)=>{await dbDel("devis",id);setDevis(devis.filter(d=>d.id!==id));showToast("Supprimé");};
+  const del=async(id)=>{await dbDel("devis",id);setDevis(devis.filter(d=>d.id!==id));updateAngyState("devis",devis.filter(d=>d.id!==id));showToast("Supprimé");};
 
   const imprimer=()=>{
     if(!preview)return;
@@ -1955,7 +1961,7 @@ function Clients({clients,setClients,factures,showToast,rechercheFiltre=""}) {
       setEditId(null);showToast("Client modifié ✓");
     } else {
       const rows=await dbAdd("clients",form);
-      setClients([rows[0],...clients]);
+      setClients([rows[0],...clients]);updateAngyState("clients",[rows[0],...clients]);
       showToast("Client ajouté ✓");
     }
     setForm({nom:"",telephone:"",email:"",adresse:"",type:"Particulier",note:""});
@@ -1963,7 +1969,7 @@ function Clients({clients,setClients,factures,showToast,rechercheFiltre=""}) {
   };
 
   const startEdit=(c)=>{setForm({nom:c.nom,telephone:c.telephone||"",email:c.email||"",adresse:c.adresse||"",type:c.type||"Particulier",note:c.note||""});setEditId(c.id);setShow(true);};
-  const del=async(id)=>{await dbDel("clients",id);setClients(clients.filter(c=>c.id!==id));showToast("Supprimé");};
+  const del=async(id)=>{await dbDel("clients",id);setClients(clients.filter(c=>c.id!==id));updateAngyState("clients",clients.filter(c=>c.id!==id));showToast("Supprimé");};
 
   const imprimer=()=>{
     const iframe=document.createElement("iframe");
@@ -2592,6 +2598,7 @@ export default function App() {
           clients:Array.isArray(c)?c:[],
           devis:Array.isArray(dv)?dv:[]
         };
+        _angyState = data;
         setDepenses(data.depenses);
         setStock(data.stock);
         setVentes(data.ventes);
