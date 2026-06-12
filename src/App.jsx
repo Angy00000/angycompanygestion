@@ -114,23 +114,36 @@ const AngyLogo = ({height=50,forPrint=false}) => {
   const ctx = useContext(ThemeCtx);
   const dark = ctx ? ctx.dark : false;
   const textColor = forPrint ? "#1C1C1E" : (dark ? "#ffffff" : "#1C1C1E");
+  const scale = height / 100;
+  const W = Math.round(420 * scale);
   return (
-    <svg height={height} viewBox="0 0 420 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg height={height} width={W} viewBox="0 0 420 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+      {/* Fond dégradé subtil derrière le logo */}
+      <defs>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1400FF"/>
+          <stop offset="100%" stopColor="#0066FF"/>
+        </linearGradient>
+        <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#CC0000"/>
+          <stop offset="100%" stopColor="#FF2200"/>
+        </linearGradient>
+      </defs>
       {/* Crochet bleu — bas gauche */}
-      <rect x="10" y="20" width="12" height="65" fill="#1400FF"/>
-      <rect x="10" y="73" width="60" height="12" fill="#1400FF"/>
+      <rect x="10" y="15" width="13" height="70" rx="3" fill="url(#blueGrad)"/>
+      <rect x="10" y="72" width="62" height="13" rx="3" fill="url(#blueGrad)"/>
       {/* Crochet rouge — haut droite */}
-      <rect x="408" y="20" width="12" height="50" fill="#CC0000"/>
-      <rect x="350" y="20" width="70" height="12" fill="#CC0000"/>
-      {/* Cercles ANGY avec fond blanc et bordure noire */}
-      {[["A",50],["N",90],["G",130],["Y",170]].map(([l,cx])=>(
+      <rect x="397" y="15" width="13" height="52" rx="3" fill="url(#redGrad)"/>
+      <rect x="348" y="15" width="62" height="13" rx="3" fill="url(#redGrad)"/>
+      {/* Cercles ANGY */}
+      {[["A",52],["N",92],["G",132],["Y",172]].map(([l,cx])=>(
         <g key={l}>
-          <circle cx={cx} cy="50" r="22" fill="white" stroke="#1C1C1E" strokeWidth="3"/>
-          <text x={cx} y="57" textAnchor="middle" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="20" fill="#1C1C1E">{l}</text>
+          <circle cx={cx} cy="50" r="23" fill={dark?"#1C1C2E":"white"} stroke={dark?"rgba(255,255,255,0.15)":"#1C1C1E"} strokeWidth="2.5"/>
+          <text x={cx} y="58" textAnchor="middle" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="21" fill={dark?"#ffffff":"#1C1C1E"}>{l}</text>
         </g>
       ))}
       {/* Company */}
-      <text x="207" y="60" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="32" fill={textColor}>Company</text>
+      <text x="210" y="62" fontFamily="Arial Black,sans-serif" fontWeight="900" fontSize="34" fill={textColor} letterSpacing="1">Company</text>
     </svg>
   );
 };
@@ -2623,6 +2636,7 @@ export default function App() {
     ...(isAdmin||isVendeur||isComptable?[{id:"devis",label:"Devis",icon:"📋"}]:[]),
     ...(isAdmin||isVendeur||isComptable?[{id:"factures",label:"Factures",icon:"🧾"}]:[]),
     ...(isAdmin||isVendeur?[{id:"crm",label:"CRM",icon:"🎯"}]:[]),
+    ...(isAdmin||isVendeur?[{id:"catalogue",label:"Catalogue",icon:"💰"}]:[]),
     ...(isAdmin||isComptable?[{id:"benefices",label:"Bénéfices",icon:"📈"}]:[]),
     ...(isAdmin||isComptable?[{id:"rapports",label:"Rapports",icon:"📊"}]:[]),
     ...(isAdmin?[{id:"categories",label:"Catégories",icon:"🏷️"}]:[]),
@@ -2646,7 +2660,9 @@ export default function App() {
           )}
           {/* Ligne 1 : Logo + Recherche + User + Toggle */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",gap:12}}>
-            <AngyLogo height={52}/>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+              <AngyLogo height={48}/>
+            </div>
             {/* Barre de recherche globale */}
             <div style={{flex:1,maxWidth:420,position:"relative"}}>
               <input value={recherche} onChange={e=>{setRecherche(e.target.value);setShowRecherche(e.target.value.length>1);}}
@@ -2716,6 +2732,7 @@ export default function App() {
               {page==="factures"   &&<Factures    factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} clients={clients} rechercheFiltre={rechercheFiltre}/>}
               {page==="clients"    &&<Clients     clients={clients} setClients={setClients} factures={factures} showToast={showToast} rechercheFiltre={rechercheFiltre}/>}
               {page==="crm"        &&<CRM         showToast={showToast}/>}
+              {page==="catalogue"  &&<Catalogue   showToast={showToast}/>}
               {page==="benefices"  &&<Benefices   depenses={depenses} ventes={ventes} stock={stock} factures={factures}/>}
               {page==="rapports"   &&<Rapports    depenses={depenses} stock={stock} ventes={ventes} factures={factures} catStk={catStk}/>}
               {page==="categories" &&<Categories  catDep={catDep} setCatDep={setCatDep} catStk={catStk} setCatStk={setCatStk} showToast={showToast}/>}
@@ -2799,7 +2816,7 @@ function CRM({showToast}) {
 
   const [prospects, setProspects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [vue, setVue] = useState("liste"); // liste | kanban | stats
+  const [vue, setVue] = useState("liste");
   const [filtre, setFiltre] = useState("tous");
   const [recherche, setRecherche] = useState("");
   const [modal, setModal] = useState(null);
@@ -2807,6 +2824,43 @@ function CRM({showToast}) {
   const [noteInput, setNoteInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(null);
+  const [quickForm, setQuickForm] = useState({nom:"",telephone:"",produit:"iPhone",source:"WhatsApp"});
+  const [showQuick, setShowQuick] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [selectedProspectTemplate, setSelectedProspectTemplate] = useState(null);
+
+  const TEMPLATES_WHATSAPP = [
+    {
+      label:"🆕 Premier contact",
+      icon:"👋",
+      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 😊\n\nMerci de nous avoir contacté chez ANGY COMPANY.\n\nJe suis Ange, votre conseiller tech. Quel iPhone vous intéresse ?\n\n📱 Nous avons du stock disponible !\n\nAngy Company — +221 78 116 32 86`
+    },
+    {
+      label:"🔔 Relance J+2",
+      icon:"📲",
+      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 😊\n\nJe voulais savoir si vous êtes toujours intéressé par ${p?.produit||"l'iPhone"} ?\n\nOn a du stock disponible et les prix sont toujours les mêmes. N'hésitez pas !\n\n📞 +221 78 116 32 86\nAngy Company`
+    },
+    {
+      label:"🔥 Relance J+7",
+      icon:"⚡",
+      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} !\n\n🔥 Offre spéciale cette semaine chez ANGY COMPANY !\n\nStock limité sur ${p?.produit||"les iPhones"} — ne ratez pas cette opportunité !\n\n✅ Authentique · 🚚 Livraison Dakar\n💳 Wave · Orange Money · Espèces\n\n📞 +221 78 116 32 86`
+    },
+    {
+      label:"💰 Envoi de prix",
+      icon:"📋",
+      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 😊\n\nVoici nos prix actuels :\n\n📱 iPhone 15 → 290 000 F\n📱 iPhone 16 → 380 000 F\n📱 iPhone 17 → 510 000 F\n📱 iPhone 17 Pro Max → 780 000 F\n\n✅ Tous authentiques & garantis\n🚚 Livraison sur Dakar\n\nLequel vous intéresse ?\n📞 +221 78 116 32 86`
+    },
+    {
+      label:"✅ Confirmation vente",
+      icon:"🎉",
+      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🎉\n\nMerci pour votre confiance chez ANGY COMPANY !\n\nVotre commande est confirmée ✅\n\nNous vous contacterons pour la livraison.\n\nBonne utilisation ! 😊\n— Ange, ANGY COMPANY`
+    },
+    {
+      label:"📦 Livraison en cours",
+      icon:"🚚",
+      message:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🚚\n\nVotre commande est en route !\n\nNotre livreur sera chez vous dans les prochaines heures.\n\nRestez disponible sur ce numéro svp.\n\nMerci de votre confiance ! 😊\n— ANGY COMPANY`
+    },
+  ];
 
   useEffect(()=>{ charger(); },[]);
 
@@ -2902,14 +2956,94 @@ function CRM({showToast}) {
           <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>Suivez chaque prospect jusqu'à la vente</div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={()=>setShowTemplates(!showTemplates)} style={{background:showTemplates?"rgba(37,211,102,0.15)":"transparent",color:"#25D366",border:"1px solid rgba(37,211,102,0.3)",padding:"9px 16px",borderRadius:10,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+            💬 Messages WhatsApp
+          </button>
           <button onClick={exportCSV} style={{background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,padding:"9px 16px",borderRadius:10,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
             📥 Export CSV
+          </button>
+          <button onClick={()=>setShowQuick(!showQuick)} style={{background:"rgba(10,132,255,0.15)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+            ⚡ Ajout rapide
           </button>
           <button onClick={()=>setModal("add")} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 20px",borderRadius:10,fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 14px rgba(10,132,255,0.3)"}}>
             + Nouveau prospect
           </button>
         </div>
       </div>
+
+      {/* FORMULAIRE RAPIDE */}
+      {showQuick&&(
+        <div style={{background:"rgba(10,132,255,0.08)",border:"1px solid rgba(10,132,255,0.25)",borderRadius:14,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0A84FF",marginBottom:12}}>⚡ Ajout rapide — 3 champs seulement</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:10,alignItems:"end"}}>
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:600,color:theme.textMuted,marginBottom:4}}>Nom</label>
+              <input style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:9,padding:"9px 12px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}
+                value={quickForm.nom} onChange={e=>setQuickForm(f=>({...f,nom:e.target.value}))} placeholder="Ex: Mamadou"/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:600,color:theme.textMuted,marginBottom:4}}>Téléphone</label>
+              <input style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:9,padding:"9px 12px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}
+                value={quickForm.telephone} onChange={e=>setQuickForm(f=>({...f,telephone:e.target.value}))} placeholder="+221 XX XXX XX XX"/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:600,color:theme.textMuted,marginBottom:4}}>Produit</label>
+              <select style={{width:"100%",background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:9,padding:"9px 12px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"}}
+                value={quickForm.produit} onChange={e=>setQuickForm(f=>({...f,produit:e.target.value}))}>
+                {PRODUITS.map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <button onClick={async()=>{
+              if(!quickForm.nom||!quickForm.telephone) return showToast("Nom et téléphone obligatoires");
+              const data={...quickForm,ville:"Dakar",budget:"",statut:"Nouveau",created_at:new Date().toISOString(),historique:JSON.stringify([{date:new Date().toLocaleDateString("fr-FR"),action:"Créé",note:"Ajout rapide"}])};
+              try{
+                const r=await fetch(`${SURL}/rest/v1/prospects`,{method:"POST",headers:H,body:JSON.stringify(data)});
+                if(r.ok){const [p]=await r.json();setProspects(prev=>[p,...prev]);}
+              }catch{setProspects(prev=>[{...data,id:Date.now()},...prev]);}
+              setQuickForm({nom:"",telephone:"",produit:"iPhone",source:"WhatsApp"});
+              setShowQuick(false);
+              showToast("✅ Prospect ajouté !");
+            }} style={{padding:"9px 18px",borderRadius:9,background:"#0A84FF",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:13,whiteSpace:"nowrap"}}>
+              ✅ Ajouter
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TEMPLATES WHATSAPP */}
+      {showTemplates&&(
+        <div style={{background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.25)",borderRadius:14,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#25D366",marginBottom:12}}>💬 Modèles de messages WhatsApp — Copiez et envoyez !</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8,marginBottom:selectedProspectTemplate?12:0}}>
+            {TEMPLATES_WHATSAPP.map((t,i)=>(
+              <button key={i} onClick={()=>setSelectedProspectTemplate(selectedProspectTemplate===i?null:i)}
+                style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${selectedProspectTemplate===i?"#25D366":theme.border}`,background:selectedProspectTemplate===i?"rgba(37,211,102,0.1)":theme.toggleBg,color:selectedProspectTemplate===i?"#25D366":theme.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,textAlign:"left",transition:"all 0.15s"}}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+          {selectedProspectTemplate!==null&&(
+            <div style={{marginTop:12,background:theme.toggleBg,borderRadius:11,padding:14,border:`1px solid ${theme.border}`}}>
+              <div style={{fontSize:12,color:theme.textMuted,marginBottom:8}}>Message prêt à envoyer :</div>
+              <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:theme.text,marginBottom:10}}>
+                {TEMPLATES_WHATSAPP[selectedProspectTemplate].message(null)}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{
+                  navigator.clipboard.writeText(TEMPLATES_WHATSAPP[selectedProspectTemplate].message(null));
+                  showToast("✅ Message copié !");
+                }} style={{padding:"8px 16px",borderRadius:9,background:"#25D366",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                  📋 Copier
+                </button>
+                <a href={`https://wa.me/?text=${encodeURIComponent(TEMPLATES_WHATSAPP[selectedProspectTemplate].message(null))}`} target="_blank" rel="noreferrer"
+                  style={{padding:"8px 16px",borderRadius:9,background:"rgba(37,211,102,0.15)",color:"#25D366",border:"1px solid rgba(37,211,102,0.3)",fontWeight:700,fontSize:12,textDecoration:"none",display:"inline-block"}}>
+                  📲 Ouvrir WhatsApp
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* STATS RAPIDES */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:18}}>
@@ -3245,10 +3379,226 @@ function CRM({showToast}) {
                   🗑 Supprimer
                 </button>
               </div>
+
+              {/* TEMPLATES WHATSAPP DANS LA FICHE */}
+              <div style={{marginTop:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:theme.textMuted,marginBottom:8,textTransform:"uppercase"}}>📲 Messages rapides WhatsApp</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {TEMPLATES_WHATSAPP.map((t,i)=>(
+                    <button key={i} onClick={()=>{
+                      const msg = t.message(modal);
+                      const url = `https://wa.me/${modal.telephone?.replace(/[\s+]/g,"")}?text=${encodeURIComponent(msg)}`;
+                      window.open(url,"_blank");
+                    }} style={{padding:"9px 12px",borderRadius:10,background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.2)",color:"#25D366",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,textAlign:"left",display:"flex",gap:8,alignItems:"center"}}>
+                      <span>{t.icon}</span>{t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// ─── CATALOGUE DES PRIX ────────────────────────────────────────────────────────
+function Catalogue({showToast}) {
+  const {theme} = useContext(ThemeCtx);
+
+  const PRIX_DEFAUT = [
+    {id:1, modele:"iPhone XR",          categorie:"iPhone",  prix:[{stockage:"64Go",prix:90000},{stockage:"128Go",prix:100000},{stockage:"256Go",prix:120000}]},
+    {id:2, modele:"iPhone 11",           categorie:"iPhone",  prix:[{stockage:"64Go",prix:115000},{stockage:"128Go",prix:120000},{stockage:"256Go",prix:130000}]},
+    {id:3, modele:"iPhone 11 Pro",       categorie:"iPhone",  prix:[{stockage:"64Go",prix:150000},{stockage:"256Go",prix:165000},{stockage:"512Go",prix:170000}]},
+    {id:4, modele:"iPhone 11 Pro Max",   categorie:"iPhone",  prix:[{stockage:"64Go",prix:165000},{stockage:"256Go",prix:175000},{stockage:"512Go",prix:190000}]},
+    {id:5, modele:"iPhone 12",           categorie:"iPhone",  prix:[{stockage:"64Go",prix:140000},{stockage:"128Go",prix:160000},{stockage:"256Go",prix:180000}]},
+    {id:6, modele:"iPhone 12 Pro",       categorie:"iPhone",  prix:[{stockage:"128Go",prix:185000},{stockage:"256Go",prix:195000}]},
+    {id:7, modele:"iPhone 12 Pro Max",   categorie:"iPhone",  prix:[{stockage:"128Go",prix:230000},{stockage:"256Go",prix:250000}]},
+    {id:8, modele:"iPhone 13",           categorie:"iPhone",  prix:[{stockage:"128Go",prix:190000},{stockage:"256Go",prix:210000}]},
+    {id:9, modele:"iPhone 13 Pro",       categorie:"iPhone",  prix:[{stockage:"128Go",prix:240000},{stockage:"256Go",prix:260000}]},
+    {id:10,modele:"iPhone 13 Pro Max",   categorie:"iPhone",  prix:[{stockage:"128Go",prix:290000},{stockage:"256Go",prix:310000},{stockage:"512Go",prix:340000},{stockage:"1To",prix:360000}]},
+    {id:11,modele:"iPhone 14",           categorie:"iPhone",  prix:[{stockage:"128Go",prix:250000},{stockage:"256Go",prix:260000}]},
+    {id:12,modele:"iPhone 14 Pro",       categorie:"iPhone",  prix:[{stockage:"128Go",prix:290000},{stockage:"256Go",prix:310000}]},
+    {id:13,modele:"iPhone 14 Pro Max",   categorie:"iPhone",  prix:[{stockage:"128Go",prix:370000},{stockage:"256Go",prix:390000},{stockage:"512Go",prix:410000}]},
+    {id:14,modele:"iPhone 15",           categorie:"iPhone",  prix:[{stockage:"128Go",prix:290000},{stockage:"256Go",prix:310000}]},
+    {id:15,modele:"iPhone 15 Pro",       categorie:"iPhone",  prix:[{stockage:"128Go",prix:370000},{stockage:"256Go",prix:390000}]},
+    {id:16,modele:"iPhone 15 Pro Max",   categorie:"iPhone",  prix:[{stockage:"256Go",prix:430000},{stockage:"512Go",prix:450000}]},
+    {id:17,modele:"iPhone 16",           categorie:"iPhone",  prix:[{stockage:"128Go",prix:380000},{stockage:"256Go",prix:400000}]},
+    {id:18,modele:"iPhone 16 Pro",       categorie:"iPhone",  prix:[{stockage:"256Go",prix:450000},{stockage:"512Go",prix:470000},{stockage:"1To",prix:490000}]},
+    {id:19,modele:"iPhone 16 Pro Max",   categorie:"iPhone",  prix:[{stockage:"256Go",prix:540000},{stockage:"512Go",prix:560000},{stockage:"1To",prix:580000}]},
+    {id:20,modele:"iPhone 17",           categorie:"iPhone",  prix:[{stockage:"256Go",prix:510000},{stockage:"512Go",prix:550000}]},
+    {id:21,modele:"iPhone 17 Air",       categorie:"iPhone",  prix:[{stockage:"256Go",prix:590000}]},
+    {id:22,modele:"iPhone 17 Pro",       categorie:"iPhone",  prix:[{stockage:"256Go",prix:660000},{stockage:"512Go",prix:690000},{stockage:"1To",prix:720000}]},
+    {id:23,modele:"iPhone 17 Pro Max",   categorie:"iPhone",  prix:[{stockage:"256Go",prix:780000},{stockage:"512Go",prix:830000},{stockage:"1To",prix:870000}]},
+  ];
+
+  const [catalogue, setCatalogue] = useState(()=>{
+    const saved = localStorage.getItem("angy_catalogue");
+    return saved ? JSON.parse(saved) : PRIX_DEFAUT;
+  });
+  const [editing, setEditing] = useState(null); // {id, stockageIdx}
+  const [editVal, setEditVal] = useState("");
+  const [recherche, setRecherche] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [newModele, setNewModele] = useState({modele:"",categorie:"iPhone",stockage:"128Go",prix:""});
+
+  const sauvegarder = (newCat) => {
+    setCatalogue(newCat);
+    localStorage.setItem("angy_catalogue", JSON.stringify(newCat));
+    showToast("✅ Prix mis à jour !");
+  };
+
+  const modifierPrix = (id, stockageIdx, nouvPrix) => {
+    const newCat = catalogue.map(p => {
+      if(p.id !== id) return p;
+      const newPrix = [...p.prix];
+      newPrix[stockageIdx] = {...newPrix[stockageIdx], prix: Number(nouvPrix)};
+      return {...p, prix: newPrix};
+    });
+    sauvegarder(newCat);
+    setEditing(null);
+  };
+
+  const ajouterModele = () => {
+    if(!newModele.modele||!newModele.prix) return showToast("Modèle et prix obligatoires");
+    const newProd = {
+      id: Date.now(),
+      modele: newModele.modele,
+      categorie: newModele.categorie,
+      prix: [{stockage: newModele.stockage, prix: Number(newModele.prix)}]
+    };
+    sauvegarder([...catalogue, newProd]);
+    setNewModele({modele:"",categorie:"iPhone",stockage:"128Go",prix:""});
+    setShowAdd(false);
+  };
+
+  const supprimerModele = (id) => {
+    if(!window.confirm("Supprimer ce modèle ?")) return;
+    sauvegarder(catalogue.filter(p=>p.id!==id));
+  };
+
+  const copierListePrix = () => {
+    const txt = catalogue
+      .filter(p=>p.modele.toLowerCase().includes(recherche.toLowerCase())||!recherche)
+      .map(p=>`${p.modele}\n${p.prix.map(px=>`  • ${px.stockage} → ${px.prix.toLocaleString("fr-FR")} FCFA`).join("\n")}`)
+      .join("\n\n");
+    navigator.clipboard.writeText(txt);
+    showToast("✅ Liste des prix copiée !");
+  };
+
+  const filtres = catalogue.filter(p=>p.modele.toLowerCase().includes(recherche.toLowerCase())||!recherche);
+
+  const inp = {background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:8,padding:"6px 10px",color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none"};
+
+  return (
+    <div style={{padding:"20px 16px",maxWidth:1100,margin:"0 auto"}}>
+      {/* HEADER */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:800}}>💰 Catalogue des prix</div>
+          <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>Modifiez vos prix directement — synchronisé partout</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={copierListePrix} style={{background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,padding:"9px 16px",borderRadius:10,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+            📋 Copier tous les prix
+          </button>
+          <button onClick={()=>sauvegarder(PRIX_DEFAUT)} style={{background:theme.toggleBg,color:theme.textMuted,border:`1px solid ${theme.border}`,padding:"9px 16px",borderRadius:10,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+            🔄 Réinitialiser
+          </button>
+          <button onClick={()=>setShowAdd(!showAdd)} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 20px",borderRadius:10,fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+            + Ajouter modèle
+          </button>
+        </div>
+      </div>
+
+      {/* AJOUTER MODELE */}
+      {showAdd&&(
+        <div style={{background:`rgba(10,132,255,0.08)`,border:`1px solid rgba(10,132,255,0.25)`,borderRadius:14,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0A84FF",marginBottom:12}}>+ Nouveau modèle</div>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr auto",gap:10,alignItems:"end"}}>
+            <div>
+              <label style={{display:"block",fontSize:11,color:theme.textMuted,marginBottom:4,fontWeight:600}}>Nom du modèle</label>
+              <input style={{...inp,width:"100%",boxSizing:"border-box"}} value={newModele.modele} onChange={e=>setNewModele(f=>({...f,modele:e.target.value}))} placeholder="Ex: iPhone 18"/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,color:theme.textMuted,marginBottom:4,fontWeight:600}}>Catégorie</label>
+              <select style={{...inp,width:"100%"}} value={newModele.categorie} onChange={e=>setNewModele(f=>({...f,categorie:e.target.value}))}>
+                {["iPhone","MacBook","iPad","AirPods","Autre"].map(c=><option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,color:theme.textMuted,marginBottom:4,fontWeight:600}}>Stockage</label>
+              <input style={{...inp,width:"100%",boxSizing:"border-box"}} value={newModele.stockage} onChange={e=>setNewModele(f=>({...f,stockage:e.target.value}))} placeholder="128Go"/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,color:theme.textMuted,marginBottom:4,fontWeight:600}}>Prix (FCFA)</label>
+              <input type="number" style={{...inp,width:"100%",boxSizing:"border-box"}} value={newModele.prix} onChange={e=>setNewModele(f=>({...f,prix:e.target.value}))} placeholder="300000"/>
+            </div>
+            <button onClick={ajouterModele} style={{padding:"8px 16px",borderRadius:9,background:"#0A84FF",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:13}}>
+              ✅ Ajouter
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* RECHERCHE */}
+      <div style={{marginBottom:16}}>
+        <input value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="🔍 Rechercher un modèle..."
+          style={{...inp,width:"100%",boxSizing:"border-box",padding:"10px 14px",fontSize:14}}/>
+      </div>
+
+      {/* INFO */}
+      <div style={{background:`rgba(255,159,10,0.1)`,border:`1px solid rgba(255,159,10,0.25)`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#FF9F0A"}}>
+        💡 <strong>Comment modifier un prix :</strong> Appuyez sur le prix → tapez le nouveau montant → Entrée ou ✅
+      </div>
+
+      {/* LISTE */}
+      <div style={{display:"grid",gap:10}}>
+        {filtres.map(p=>(
+          <div key={p.id} style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:14,padding:"14px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontWeight:700,fontSize:15}}>📱 {p.modele}</div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:11,color:theme.textMuted,background:theme.toggleBg,padding:"3px 9px",borderRadius:99,border:`1px solid ${theme.border}`}}>{p.categorie}</span>
+                <button onClick={()=>supprimerModele(p.id)} style={{background:"none",border:"none",color:theme.textMuted,cursor:"pointer",fontSize:16,padding:"2px 6px"}}>🗑</button>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {p.prix.map((px,i)=>(
+                <div key={i} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"8px 12px",minWidth:120}}>
+                  <div style={{fontSize:11,color:theme.textMuted,marginBottom:4,fontWeight:600}}>{px.stockage}</div>
+                  {editing?.id===p.id&&editing?.idx===i ? (
+                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <input type="number" autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                        onKeyDown={e=>{if(e.key==="Enter")modifierPrix(p.id,i,editVal);if(e.key==="Escape")setEditing(null);}}
+                        style={{...inp,width:80,padding:"4px 8px",fontSize:13}}/>
+                      <button onClick={()=>modifierPrix(p.id,i,editVal)} style={{background:"#30D158",color:"#fff",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:12,fontWeight:700}}>✅</button>
+                    </div>
+                  ):(
+                    <div onClick={()=>{setEditing({id:p.id,idx:i});setEditVal(String(px.prix));}}
+                      style={{fontSize:15,fontWeight:800,color:"#30D158",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                      {px.prix.toLocaleString("fr-FR")} F
+                      <span style={{fontSize:11,color:theme.textMuted}}>✏️</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {/* Ajouter une variante */}
+              <div style={{background:`rgba(10,132,255,0.05)`,border:`1px dashed rgba(10,132,255,0.3)`,borderRadius:10,padding:"8px 12px",minWidth:100,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}
+                onClick={()=>{
+                  const stockage = prompt("Stockage (ex: 512Go):");
+                  const prix = prompt("Prix en FCFA:");
+                  if(!stockage||!prix) return;
+                  const newCat = catalogue.map(prod=>prod.id===p.id?{...prod,prix:[...prod.prix,{stockage,prix:Number(prix)}]}:prod);
+                  sauvegarder(newCat);
+                }}>
+                <span style={{fontSize:11,color:"#0A84FF",fontWeight:600}}>+ Variante</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
