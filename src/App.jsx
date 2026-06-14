@@ -5,11 +5,77 @@ const SURL = "https://nfpnhyvuwpzezwbmxtgd.supabase.co";
 const SKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mcG5oeXZ1d3B6ZXp3Ym14dGdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODU5NTAsImV4cCI6MjA5NjE2MTk1MH0.u9ptkVSXwgT75m9WgRLsUnygEJGYK4ESyv6jBUeNtO4";
 const H = { "apikey": SKEY, "Authorization": `Bearer ${SKEY}`, "Content-Type": "application/json", "Prefer": "return=representation" };
 
+// ─── OFFLINE QUEUE ───────────────────────────────────────────────────────────
+const QUEUE_KEY = "angy_offline_queue";
+const getQueue = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; } catch { return []; } };
+const saveQueue = (q) => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+const addToQueue = (op) => { const q = getQueue(); q.push({...op, _id: Date.now()}); saveQueue(q); };
+
+// ─── LOCAL CACHE ─────────────────────────────────────────────────────────────
+const getLocal = (t) => { try { return JSON.parse(localStorage.getItem("angy_cache_"+t)) || []; } catch { return []; } };
+const saveLocal = (t, data) => localStorage.setItem("angy_cache_"+t, JSON.stringify(data));
+
+// ─── SYNC QUEUE WITH SUPABASE ────────────────────────────────────────────────
+const syncQueue = async () => {
+  const q = getQueue();
+  if (!q.length) return;
+  const remaining = [];
+  for (const op of q) {
+    try {
+      if (op.type === "add") {
+        const r = await fetch(`${SURL}/rest/v1/${op.table}`, { method: "POST", headers: H, body: JSON.stringify(op.data) });
+        if (!r.ok) { remaining.push(op); }
+      } else if (op.type === "del") {
+        await fetch(`${SURL}/rest/v1/${op.table}?id=eq.${op.id}`, { method: "DELETE", headers: H });
+      } else if (op.type === "patch") {
+        await fetch(`${SURL}/rest/v1/${op.table}?id=eq.${op.id}`, { method: "PATCH", headers: H, body: JSON.stringify(op.data) });
+      }
+    } catch { remaining.push(op); }
+  }
+  saveQueue(remaining);
+  return remaining.length === 0;
+};
+
 const db = {
-  get: async (t) => { const r = await fetch(`${SURL}/rest/v1/${t}?order=created_at.desc&limit=500`, { headers: H }); return r.ok ? r.json() : []; },
-  add: async (t, d) => { const r = await fetch(`${SURL}/rest/v1/${t}`, { method: "POST", headers: H, body: JSON.stringify(d) }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j[0] : j; },
-  del: async (t, id) => { await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "DELETE", headers: H }); },
-  patch: async (t, id, d) => { await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "PATCH", headers: H, body: JSON.stringify(d) }); },
+  get: async (t) => {
+    try {
+      const r = await fetch(`${SURL}/rest/v1/${t}?order=created_at.desc&limit=500`, { headers: H });
+      if (r.ok) { const data = await r.json(); saveLocal(t, data); return data; }
+    } catch {}
+    // Offline: return cached data
+    return getLocal(t);
+  },
+  add: async (t, d) => {
+    try {
+      const r = await fetch(`${SURL}/rest/v1/${t}`, { method: "POST", headers: H, body: JSON.stringify(d) });
+      if (r.ok) {
+        const j = await r.json();
+        const item = Array.isArray(j) ? j[0] : j;
+        // Update local cache
+        const cached = getLocal(t);
+        saveLocal(t, [item, ...cached]);
+        return item;
+      }
+    } catch {}
+    // Offline: save to queue and return temp item
+    const tempItem = { ...d, id: "temp_"+Date.now(), _offline: true };
+    addToQueue({ type: "add", table: t, data: d });
+    const cached = getLocal(t);
+    saveLocal(t, [tempItem, ...cached]);
+    return tempItem;
+  },
+  del: async (t, id) => {
+    try { await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "DELETE", headers: H }); }
+    catch { addToQueue({ type: "del", table: t, id }); }
+    const cached = getLocal(t);
+    saveLocal(t, cached.filter(x => x.id !== id));
+  },
+  patch: async (t, id, d) => {
+    try { await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "PATCH", headers: H, body: JSON.stringify(d) }); }
+    catch { addToQueue({ type: "patch", table: t, id, data: d }); }
+    const cached = getLocal(t);
+    saveLocal(t, cached.map(x => x.id === id ? {...x, ...d} : x));
+  },
 };
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -1538,6 +1604,40 @@ export default function App() {
   const [toast,setToast] = useState(null);
   const [ventePrefill,setVentePrefill] = useState(null);
   const [showFacturePopup,setShowFacturePopup] = useState(false);
+  const [isOnline,setIsOnline] = useState(navigator.onLine);
+  const [pendingSync,setPendingSync] = useState(0);
+
+  // ─── PWA SERVICE WORKER ───────────────────────────────────────────────────
+  useEffect(()=>{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    }
+  },[]);
+
+  // ─── ONLINE/OFFLINE DETECTION + AUTO SYNC ────────────────────────────────
+  useEffect(()=>{
+    const goOnline = async () => {
+      setIsOnline(true);
+      const q = getQueue();
+      if(q.length > 0){
+        const ok = await syncQueue();
+        if(ok){
+          // Refresh data after sync
+          const [s,v,f,d] = await Promise.all([db.get("stock"),db.get("ventes"),db.get("factures"),db.get("depenses")]);
+          setStock(s); setVentes(v); setFactures(f); setDepenses(d);
+          setPendingSync(0);
+          showToast("✅ Synchronisation réussie !");
+        }
+      }
+    };
+    const goOffline = () => { setIsOnline(false); };
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  },[]);
+
+  // Track pending items
+  useEffect(()=>{ setPendingSync(getQueue().length); },[stock,ventes,depenses,factures]);
 
   const showToast = (msg,err=false) => { setToast({msg,err}); setTimeout(()=>setToast(null),3000); };
 
@@ -1566,11 +1666,23 @@ export default function App() {
     <ThemeCtx.Provider value={{dark,toggle:()=>setDark(d=>!d),theme}}>
       {!user?<Login onLogin={u=>setUser(u)}/>:(
         <div style={{ minHeight:"100vh", background:theme.bg, fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+          {/* OFFLINE BANNER */}
+          {!isOnline&&(
+            <div style={{ background:"#FF9F0A", color:"#fff", padding:"8px 16px", textAlign:"center", fontSize:13, fontWeight:700 }}>
+              📵 Mode hors ligne — vos données sont sauvegardées localement{pendingSync>0?` (${pendingSync} en attente)`:""}
+            </div>
+          )}
+          {isOnline&&pendingSync>0&&(
+            <div style={{ background:"#30D158", color:"#fff", padding:"6px 16px", textAlign:"center", fontSize:12, fontWeight:700 }}>
+              🔄 Synchronisation en cours... {pendingSync} élément{pendingSync>1?"s":""} à envoyer
+            </div>
+          )}
           {/* HEADER */}
           <div style={{ background:theme.nav, borderBottom:`1px solid ${theme.border}`, padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, position:"sticky", top:0, zIndex:100 }}>
             <Logo size={40}/>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <span style={{ fontSize:12, color:theme.textMuted, fontWeight:600 }}>{user?.nom}</span>
+              <span style={{ fontSize:16 }}>{isOnline?"🟢":"🔴"}</span>
               <button onClick={()=>setDark(d=>!d)} style={{ background:theme.toggleBg, border:`1px solid ${theme.border}`, borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:16 }}>{dark?"☀️":"🌙"}</button>
               <button onClick={logout} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", borderRadius:8, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>Déco</button>
             </div>
