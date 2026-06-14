@@ -116,7 +116,7 @@ const Toast = ({ msg, err }) => (
 const USERS = [
   { id:1, nom:"Ange Admin",  email:"admin@angy.com",      mdp:"angy2024",    role:"admin" },
   { id:2, nom:"Vendeur",     email:"vendeur@angy.com",    mdp:"vendeur2024", role:"vendeur" },
-  { id:3, nom:"Comptable",   email:"comptable@angy.com",  mdp:"compta2024",  role:"comptable" },
+  { id:3, nom:"Comptable",   email:"comptable@angy.com",  mdp:"compta2024",  role:"comptable" }
 ];
 const Login = ({ onLogin }) => {
   const { theme } = useContext(ThemeCtx);
@@ -332,7 +332,7 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
 // ─── STOCK ────────────────────────────────────────────────────────────────────
 const Stock = ({ stock, setStock, showToast, role }) => {
   const { theme } = useContext(ThemeCtx);
-  const CATS_DEFAUT = ["iPhones","Samsung Série A","Samsung Série S","Tablettes","Accessoires","Ordinateurs","Autre"];
+  const CATS_DEFAUT = ["iPhones","Tablettes","Accessoires","Ordinateurs","Autre"];
   const [cats,setCats] = useState(()=>{ try{return JSON.parse(localStorage.getItem("angy_cats"))||CATS_DEFAUT;}catch{return CATS_DEFAUT;} });
   const [newCat,setNewCat] = useState("");
   const [showCats,setShowCats] = useState(false);
@@ -749,18 +749,7 @@ const PRIX_DEFAUT = [
   {id:20,modele:"iPhone 17",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:510000},{s:"512 Go",p:550000}]},
   {id:21,modele:"iPhone 17 Air",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:590000}]},
   {id:22,modele:"iPhone 17 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:660000},{s:"512 Go",p:690000},{s:"1 To",p:720000}]},
-  {id:23,modele:"iPhone 17 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:780000},{s:"512 Go",p:830000},{s:"1 To",p:870000}]},
-  {id:24,modele:"Galaxy A05",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"64 Go",p:45000},{s:"128 Go",p:55000}]},
-  {id:25,modele:"Galaxy A06",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"64 Go",p:50000},{s:"128 Go",p:60000}]},
-  {id:26,modele:"Galaxy A16 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:110000},{s:"256 Go",p:130000}]},
-  {id:27,modele:"Galaxy A26 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:155000},{s:"256 Go",p:175000}]},
-  {id:28,modele:"Galaxy A36 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:200000},{s:"256 Go",p:225000}]},
-  {id:29,modele:"Galaxy A56 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:260000},{s:"256 Go",p:285000}]},
-  {id:30,modele:"Galaxy S23 Ultra",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"256 Go",p:380000},{s:"512 Go",p:420000}]},
-  {id:31,modele:"Galaxy S24 FE",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"128 Go",p:270000},{s:"256 Go",p:300000}]},
-  {id:32,modele:"Galaxy S24 Ultra",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"256 Go",p:500000},{s:"512 Go",p:555000}]},
-  {id:33,modele:"Galaxy S25",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"128 Go",p:330000},{s:"256 Go",p:360000}]},
-  {id:34,modele:"Galaxy S25 Ultra",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"256 Go",p:570000},{s:"512 Go",p:620000},{s:"1 To",p:680000}]}
+  {id:23,modele:"iPhone 17 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:780000},{s:"512 Go",p:830000},{s:"1 To",p:870000}]}
 ];
 
 const Catalogue = ({ showToast, stock=[], setStock }) => {
@@ -1045,8 +1034,8 @@ const CRM = ({ showToast }) => {
     {label:"🔥 Relance J+7",       msg:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🔥\n\nOffre spéciale cette semaine !\n✅ Authentique · 🚚 Livraison Dakar\n💳 Wave · Orange Money · Espèces\n\n📞 +221 78 116 32 86`},
     {label:"💰 Envoi prix",        msg:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 😊\n\nNos prix :\n📱 iPhone 15 → 290 000 F\n📱 iPhone 16 → 380 000 F\n📱 iPhone 17 → 510 000 F\n📱 iPhone 17 Pro Max → 780 000 F\n\n✅ Authentiques · 🚚 Livraison Dakar\n📞 +221 78 116 32 86`},
     {label:"✅ Confirmation vente", msg:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🎉\n\nMerci pour votre confiance !\nVotre commande est confirmée ✅\nNous vous contacterons pour la livraison.\n\n— Ange, ANGY COMPANY`},
-    {label:"🚚 Livraison en cours", msg:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🚚\n\nVotre commande est en route !\nRestez disponible svp.\n\nMerci ! 😊 — ANGY COMPANY`},
-  ];
+    {label:"🚚 Livraison en cours", msg:(p)=>`Bonjour ${p?.nom||"[Nom]"} ! 🚚\n\nVotre commande est en route !\nRestez disponible svp.\n\nMerci ! 😊 — ANGY COMPANY`}
+];
   const [prospects,setProspects] = useState([]);
   const [loading,setLoading] = useState(true);
   const [modal,setModal] = useState(null);
