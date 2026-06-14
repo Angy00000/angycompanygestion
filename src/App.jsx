@@ -74,60 +74,191 @@ const Login = ({ onLogin }) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const Dashboard = ({ stock, ventes, factures, depenses }) => {
-  const { theme } = useContext(ThemeCtx);
+  const { theme, dark } = useContext(ThemeCtx);
   const ca = ventes.reduce((s,v)=>s+Number(v.prix_vente)*Number(v.qte||1),0);
   const dep = depenses.reduce((s,d)=>s+Number(d.montant),0);
   const benefice = ca - dep;
+  const marge = ca>0?Math.round((benefice/ca)*100):0;
   const stockBas = stock.filter(p=>Number(p.qte)<=Number(p.seuil||3));
+  const today = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+
+  // CA mensuel
   const moisCA = {};
   ventes.forEach(v=>{ const m=v.date?v.date.slice(0,7):new Date(v.created_at).toISOString().slice(0,7); moisCA[m]=(moisCA[m]||0)+Number(v.prix_vente)*Number(v.qte||1); });
   const moisList = Object.entries(moisCA).sort((a,b)=>a[0].localeCompare(b[0])).slice(-6);
   const maxCA = Math.max(...moisList.map(([,v])=>v),1);
-  const cards = [
-    { label:"Chiffre d'affaires", value:ca.toLocaleString("fr-FR")+" F", color:"#30D158", icon:"💰" },
-    { label:"Dépenses",           value:dep.toLocaleString("fr-FR")+" F", color:"#FF453A", icon:"📤" },
-    { label:"Bénéfice net",       value:benefice.toLocaleString("fr-FR")+" F", color:benefice>=0?"#30D158":"#FF453A", icon:"📈" },
-    { label:"Ventes",             value:ventes.length, color:"#0A84FF", icon:"🛒" },
-    { label:"Produits en stock",  value:stock.length,  color:"#BF5AF2", icon:"📦" },
-    { label:"Stock bas",          value:stockBas.length, color:"#FF9F0A", icon:"⚠️" },
-  ];
+  const dernierMois = moisList[moisList.length-1];
+  const avantDernier = moisList[moisList.length-2];
+  const evol = avantDernier?Math.round(((dernierMois?.[1]||0)-(avantDernier?.[1]||0))/(avantDernier?.[1]||1)*100):0;
+
+  // Top produits
+  const parProduit = {};
+  ventes.forEach(v=>{ if(!parProduit[v.produit])parProduit[v.produit]={qte:0,ca:0}; parProduit[v.produit].qte+=Number(v.qte||1); parProduit[v.produit].ca+=Number(v.prix_vente)*Number(v.qte||1); });
+  const topProduits = Object.entries(parProduit).sort((a,b)=>b[1].ca-a[1].ca).slice(0,4);
+
+  // Dernières ventes
+  const dernieresVentes = [...ventes].slice(0,5);
+
+  const MOIS_FR = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+
   return (
-    <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
-      <div style={{ fontSize:22, fontWeight:800, color:theme.text, marginBottom:4 }}>📊 Dashboard</div>
-      <div style={{ fontSize:13, color:theme.textMuted, marginBottom:20 }}>Vue d'ensemble de votre activité</div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
-        {cards.map(c=>(
-          <div key={c.label} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:"16px 14px" }}>
-            <div style={{ fontSize:24, marginBottom:8 }}>{c.icon}</div>
-            <div style={{ fontSize:20, fontWeight:800, color:c.color }}>{c.value}</div>
-            <div style={{ fontSize:11, color:theme.textMuted, marginTop:4 }}>{c.label}</div>
+    <div style={{padding:"20px 16px",maxWidth:1200,margin:"0 auto"}}>
+
+      {/* HEADER DASHBOARD */}
+      <div style={{marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:26,fontWeight:900,color:theme.text}}>Bonjour Ange 👋</div>
+          <div style={{fontSize:13,color:theme.textMuted,marginTop:4,textTransform:"capitalize"}}>{today}</div>
+        </div>
+        {evol!==0&&(
+          <div style={{background:evol>=0?"rgba(48,209,88,0.12)":"rgba(255,69,58,0.12)",border:`1px solid ${evol>=0?"rgba(48,209,88,0.3)":"rgba(255,69,58,0.3)"}`,borderRadius:12,padding:"10px 16px",display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:20}}>{evol>=0?"📈":"📉"}</span>
+            <div>
+              <div style={{fontSize:11,color:theme.textMuted}}>vs mois dernier</div>
+              <div style={{fontWeight:800,color:evol>=0?"#30D158":"#FF453A",fontSize:16}}>{evol>=0?"+":""}{evol}%</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* CARTES PRINCIPALES — ligne 1 */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:14}}>
+        {/* CA */}
+        <div style={{background:"linear-gradient(135deg,#1400FF,#0066FF)",borderRadius:20,padding:"20px 18px",color:"#fff",gridColumn:"span 1",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,background:"rgba(255,255,255,0.08)",borderRadius:"50%"}}/>
+          <div style={{position:"absolute",right:20,bottom:-30,width:80,height:80,background:"rgba(255,255,255,0.06)",borderRadius:"50%"}}/>
+          <div style={{fontSize:13,fontWeight:600,opacity:0.85,marginBottom:8}}>💰 Chiffre d'affaires</div>
+          <div style={{fontSize:26,fontWeight:900,marginBottom:4}}>{ca.toLocaleString("fr-FR")}</div>
+          <div style={{fontSize:12,opacity:0.75}}>FCFA · {ventes.length} vente{ventes.length>1?"s":""}</div>
+        </div>
+        {/* BÉNÉFICE */}
+        <div style={{background:benefice>=0?"linear-gradient(135deg,#1DB954,#30D158)":"linear-gradient(135deg,#CC0000,#FF453A)",borderRadius:20,padding:"20px 18px",color:"#fff",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,background:"rgba(255,255,255,0.08)",borderRadius:"50%"}}/>
+          <div style={{fontSize:13,fontWeight:600,opacity:0.85,marginBottom:8}}>📈 Bénéfice net</div>
+          <div style={{fontSize:26,fontWeight:900,marginBottom:4}}>{benefice.toLocaleString("fr-FR")}</div>
+          <div style={{fontSize:12,opacity:0.75}}>FCFA · Marge {marge}%</div>
+        </div>
+        {/* DÉPENSES */}
+        <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:"20px 18px"}}>
+          <div style={{fontSize:13,fontWeight:600,color:theme.textMuted,marginBottom:8}}>📤 Dépenses</div>
+          <div style={{fontSize:26,fontWeight:900,color:"#FF453A",marginBottom:4}}>{dep.toLocaleString("fr-FR")}</div>
+          <div style={{fontSize:12,color:theme.textMuted}}>FCFA total</div>
+        </div>
+      </div>
+
+      {/* CARTES SECONDAIRES */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:24}}>
+        {[
+          {icon:"🛒",label:"Ventes",value:ventes.length,color:"#0A84FF",sub:"transactions"},
+          {icon:"📦",label:"Produits en stock",value:stock.length,color:"#BF5AF2",sub:"références"},
+          {icon:"⚠️",label:"Stock bas",value:stockBas.length,color:stockBas.length>0?"#FF9F0A":"#30D158",sub:stockBas.length>0?"à réapprovisionner":"Tout va bien"},
+        ].map(c=>(
+          <div key={c.label} style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:"18px 16px",display:"flex",gap:14,alignItems:"center"}}>
+            <div style={{width:48,height:48,borderRadius:14,background:`${c.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{c.icon}</div>
+            <div>
+              <div style={{fontSize:22,fontWeight:900,color:c.color}}>{c.value}</div>
+              <div style={{fontSize:12,color:theme.textMuted,marginTop:1}}>{c.label}</div>
+              <div style={{fontSize:10,color:c.color,fontWeight:600,marginTop:2}}>{c.sub}</div>
+            </div>
           </div>
         ))}
       </div>
-      {moisList.length>0&&(
-        <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:20, marginBottom:20 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:theme.text, marginBottom:16 }}>📈 CA mensuel</div>
-          <div style={{ display:"flex", gap:10, alignItems:"flex-end", height:140 }}>
-            {moisList.map(([m,v])=>(
-              <div key={m} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-                <div style={{ fontSize:10, color:theme.textMuted, fontWeight:600 }}>{(v/1000).toFixed(0)}k</div>
-                <div style={{ width:"100%", background:"#0A84FF", borderRadius:"6px 6px 0 0", height:`${Math.round((v/maxCA)*110)}px`, minHeight:4 }}/>
-                <div style={{ fontSize:10, color:theme.textMuted }}>{m.slice(5)}/{m.slice(2,4)}</div>
-              </div>
-            ))}
+
+      {/* GRAPHIQUE + TOP PRODUITS */}
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16,marginBottom:20}}>
+
+        {/* GRAPHIQUE */}
+        <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <div style={{fontSize:15,fontWeight:800,color:theme.text}}>📈 CA mensuel</div>
+            {dernierMois&&<div style={{fontSize:12,color:theme.textMuted}}>{(dernierMois[1]/1000).toFixed(0)}k ce mois</div>}
           </div>
-        </div>
-      )}
-      {stockBas.length>0&&(
-        <div style={{ background:"rgba(255,159,10,0.08)", border:"1px solid rgba(255,159,10,0.3)", borderRadius:14, padding:16 }}>
-          <div style={{ fontWeight:700, color:"#FF9F0A", marginBottom:10 }}>⚠️ Stock bas</div>
-          {stockBas.map(p=>(
-            <div key={p.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${theme.border}`, fontSize:13, color:theme.text }}>
-              <span>{p.nom}</span><span style={{ color:"#FF453A", fontWeight:700 }}>{p.qte} unité(s)</span>
+          {moisList.length===0?(
+            <div style={{textAlign:"center",padding:"2rem",color:theme.textMuted,fontSize:13}}>Aucune vente pour le moment</div>
+          ):(
+            <div style={{display:"flex",gap:8,alignItems:"flex-end",height:160,paddingBottom:4}}>
+              {moisList.map(([m,v],i)=>{
+                const isLast = i===moisList.length-1;
+                const h = Math.round((v/maxCA)*130);
+                const mNum = parseInt(m.slice(5))-1;
+                return (
+                  <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                    <div style={{fontSize:10,color:isLast?"#0A84FF":theme.textMuted,fontWeight:isLast?800:400}}>{(v/1000).toFixed(0)}k</div>
+                    <div style={{width:"100%",background:isLast?"#0A84FF":dark?"rgba(10,132,255,0.3)":"rgba(10,132,255,0.15)",borderRadius:"8px 8px 0 0",height:`${h}px`,minHeight:4,transition:"height 0.3s"}}/>
+                    <div style={{fontSize:10,color:isLast?"#0A84FF":theme.textMuted,fontWeight:isLast?700:400}}>{MOIS_FR[mNum]}</div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
         </div>
-      )}
+
+        {/* TOP PRODUITS */}
+        <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:20}}>
+          <div style={{fontSize:15,fontWeight:800,color:theme.text,marginBottom:16}}>🏆 Top produits</div>
+          {topProduits.length===0?(
+            <div style={{textAlign:"center",padding:"2rem",color:theme.textMuted,fontSize:13}}>Aucune vente</div>
+          ):(
+            topProduits.map(([nom,data],i)=>(
+              <div key={nom} style={{marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <span style={{fontSize:14}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":"🏅"}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:theme.text}}>{nom.length>16?nom.slice(0,16)+"…":nom}</span>
+                  </div>
+                  <span style={{fontSize:11,fontWeight:700,color:"#0A84FF"}}>{data.qte} vte{data.qte>1?"s":""}</span>
+                </div>
+                <div style={{height:5,background:theme.toggleBg,borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${Math.round((data.ca/(topProduits[0]?.[1]?.ca||1))*100)}%`,background:i===0?"linear-gradient(90deg,#1400FF,#0066FF)":"#0A84FF",borderRadius:99,opacity:1-i*0.15}}/>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* DERNIÈRES VENTES + STOCK BAS */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+
+        {/* DERNIÈRES VENTES */}
+        <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:20}}>
+          <div style={{fontSize:15,fontWeight:800,color:theme.text,marginBottom:16}}>🛒 Dernières ventes</div>
+          {dernieresVentes.length===0?(
+            <div style={{textAlign:"center",padding:"2rem",color:theme.textMuted,fontSize:13}}>Aucune vente pour le moment</div>
+          ):(
+            dernieresVentes.map((v,i)=>(
+              <div key={v.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i<dernieresVentes.length-1?`1px solid ${theme.border}`:"none"}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:theme.text}}>{v.produit}</div>
+                  <div style={{fontSize:11,color:theme.textMuted,marginTop:2}}>{v.date} · {v.client||"—"}</div>
+                </div>
+                <div style={{fontSize:13,fontWeight:800,color:"#30D158"}}>{(Number(v.prix_vente)*Number(v.qte||1)).toLocaleString("fr-FR")} F</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* STOCK BAS */}
+        <div style={{background:stockBas.length>0?"rgba(255,159,10,0.06)":theme.card,border:`1px solid ${stockBas.length>0?"rgba(255,159,10,0.3)":theme.border}`,borderRadius:20,padding:20}}>
+          <div style={{fontSize:15,fontWeight:800,color:stockBas.length>0?"#FF9F0A":theme.text,marginBottom:16}}>⚠️ Stock à réapprovisionner</div>
+          {stockBas.length===0?(
+            <div style={{textAlign:"center",padding:"2rem"}}>
+              <div style={{fontSize:40,marginBottom:8}}>✅</div>
+              <div style={{fontSize:13,color:"#30D158",fontWeight:600}}>Tout votre stock est OK !</div>
+            </div>
+          ):(
+            stockBas.map((p,i)=>(
+              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i<stockBas.length-1?`1px solid rgba(255,159,10,0.2)`:"none"}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:theme.text}}>{p.nom}</div>
+                  <div style={{fontSize:11,color:theme.textMuted,marginTop:2}}>{p.cat}</div>
+                </div>
+                <div style={{background:"rgba(255,69,58,0.12)",border:"1px solid rgba(255,69,58,0.3)",borderRadius:99,padding:"4px 12px",fontSize:12,fontWeight:800,color:"#FF453A"}}>{p.qte} restant{p.qte>1?"s":""}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -530,69 +661,284 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
 
 // CATALOGUE PRIX
 const PRIX_DEFAUT = [
-  {id:1,modele:"iPhone XR",     prix:[{s:"64Go",p:90000},{s:"128Go",p:100000},{s:"256Go",p:120000}]},
-  {id:2,modele:"iPhone 11",     prix:[{s:"64Go",p:115000},{s:"128Go",p:120000},{s:"256Go",p:130000}]},
-  {id:3,modele:"iPhone 12",     prix:[{s:"64Go",p:140000},{s:"128Go",p:160000},{s:"256Go",p:180000}]},
-  {id:4,modele:"iPhone 13",     prix:[{s:"128Go",p:190000},{s:"256Go",p:210000}]},
-  {id:5,modele:"iPhone 13 Pro Max",prix:[{s:"128Go",p:290000},{s:"256Go",p:310000},{s:"512Go",p:340000}]},
-  {id:6,modele:"iPhone 14",     prix:[{s:"128Go",p:250000},{s:"256Go",p:260000}]},
-  {id:7,modele:"iPhone 14 Pro Max",prix:[{s:"128Go",p:370000},{s:"256Go",p:390000},{s:"512Go",p:410000}]},
-  {id:8,modele:"iPhone 15",     prix:[{s:"128Go",p:290000},{s:"256Go",p:310000}]},
-  {id:9,modele:"iPhone 15 Pro Max",prix:[{s:"256Go",p:430000},{s:"512Go",p:450000}]},
-  {id:10,modele:"iPhone 16",    prix:[{s:"128Go",p:380000},{s:"256Go",p:400000}]},
-  {id:11,modele:"iPhone 16 Pro Max",prix:[{s:"256Go",p:540000},{s:"512Go",p:560000},{s:"1To",p:580000}]},
-  {id:12,modele:"iPhone 17",    prix:[{s:"256Go",p:510000},{s:"512Go",p:550000}]},
-  {id:13,modele:"iPhone 17 Air",prix:[{s:"256Go",p:590000}]},
-  {id:14,modele:"iPhone 17 Pro",prix:[{s:"256Go",p:660000},{s:"512Go",p:690000},{s:"1To",p:720000}]},
-  {id:15,modele:"iPhone 17 Pro Max",prix:[{s:"256Go",p:780000},{s:"512Go",p:830000},{s:"1To",p:870000}]},
+  {id:1,modele:"iPhone XR",     photo:"",description:"Écran LCD 6.1\" · Face ID · Puce A12",disponible:true, prix:[{s:"64Go",p:90000},{s:"128Go",p:100000},{s:"256Go",p:120000}]},
+  {id:2,modele:"iPhone 11",     photo:"",description:"Écran LCD 6.1\" · Double caméra · Puce A13",disponible:true, prix:[{s:"64Go",p:115000},{s:"128Go",p:120000},{s:"256Go",p:130000}]},
+  {id:3,modele:"iPhone 12",     photo:"",description:"Écran OLED 6.1\" · 5G · Puce A14",disponible:true, prix:[{s:"64Go",p:140000},{s:"128Go",p:160000},{s:"256Go",p:180000}]},
+  {id:4,modele:"iPhone 13",     photo:"",description:"Écran OLED 6.1\" · Cinematic Mode · Puce A15",disponible:true, prix:[{s:"128Go",p:190000},{s:"256Go",p:210000}]},
+  {id:5,modele:"iPhone 13 Pro Max",photo:"",description:"Écran ProMotion 120Hz · Triple caméra · Puce A15",disponible:true, prix:[{s:"128Go",p:290000},{s:"256Go",p:310000},{s:"512Go",p:340000}]},
+  {id:6,modele:"iPhone 14",     photo:"",description:"Écran OLED 6.1\" · Mode Action · Puce A15",disponible:true, prix:[{s:"128Go",p:250000},{s:"256Go",p:260000}]},
+  {id:7,modele:"iPhone 14 Pro Max",photo:"",description:"Dynamic Island · 48MP · Puce A16",disponible:true, prix:[{s:"128Go",p:370000},{s:"256Go",p:390000},{s:"512Go",p:410000}]},
+  {id:8,modele:"iPhone 15",     photo:"",description:"USB-C · 48MP · Dynamic Island · Puce A16",disponible:true, prix:[{s:"128Go",p:290000},{s:"256Go",p:310000}]},
+  {id:9,modele:"iPhone 15 Pro Max",photo:"",description:"Titane · 5x zoom · Puce A17 Pro",disponible:true, prix:[{s:"256Go",p:430000},{s:"512Go",p:450000}]},
+  {id:10,modele:"iPhone 16",    photo:"",description:"Bouton Camera · Puce A18 · USB-C",disponible:true, prix:[{s:"128Go",p:380000},{s:"256Go",p:400000}]},
+  {id:11,modele:"iPhone 16 Pro Max",photo:"",description:"Écran 6.9\" · 5x zoom · Puce A18 Pro",disponible:true, prix:[{s:"256Go",p:540000},{s:"512Go",p:560000},{s:"1To",p:580000}]},
+  {id:12,modele:"iPhone 17",    photo:"",description:"Design fin · Puce A19 · Caméra 48MP",disponible:true, prix:[{s:"256Go",p:510000},{s:"512Go",p:550000}]},
+  {id:13,modele:"iPhone 17 Air",photo:"",description:"Le plus fin jamais fait · 6.6\" · Ultra léger",disponible:true, prix:[{s:"256Go",p:590000}]},
+  {id:14,modele:"iPhone 17 Pro",photo:"",description:"Puce A19 Pro · Triple caméra Pro",disponible:true, prix:[{s:"256Go",p:660000},{s:"512Go",p:690000},{s:"1To",p:720000}]},
+  {id:15,modele:"iPhone 17 Pro Max",photo:"",description:"Le meilleur iPhone · Puce A19 Pro · 5x zoom",disponible:true, prix:[{s:"256Go",p:780000},{s:"512Go",p:830000},{s:"1To",p:870000}]},
 ];
-const Catalogue = ({ showToast }) => {
+
+const Catalogue = ({ showToast, stock=[], setStock }) => {
   const { theme } = useContext(ThemeCtx);
   const [cat,setCat] = useState(()=>{ try{return JSON.parse(localStorage.getItem("angy_catalogue"))||PRIX_DEFAUT;}catch{return PRIX_DEFAUT;} });
-  const [editing,setEditing] = useState(null); const [editVal,setEditVal] = useState("");
-  const inp = { boxSizing:"border-box", padding:"8px 10px", borderRadius:9, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none" };
-  const save = (newCat) => { setCat(newCat); localStorage.setItem("angy_catalogue",JSON.stringify(newCat)); showToast("✅ Prix mis à jour !"); };
-  const modifier = (id,i,val) => { save(cat.map(p=>p.id!==id?p:{...p,prix:p.prix.map((px,j)=>j===i?{...px,p:Number(val)}:px)})); setEditing(null); };
-  const copier = () => {
-    const txt = cat.map(p=>`${p.modele}\n${p.prix.map(px=>`  • ${px.s} → ${px.p.toLocaleString("fr-FR")} FCFA`).join("\n")}`).join("\n\n");
-    navigator.clipboard.writeText(txt); showToast("✅ Liste copiée !");
+  const [editing,setEditing] = useState(null);
+  const [editVal,setEditVal] = useState("");
+  const [editModal,setEditModal] = useState(null);
+  const [search,setSearch] = useState("");
+  const [filtre,setFiltre] = useState("tous");
+  const [showAdd,setShowAdd] = useState(false);
+  const [newProd,setNewProd] = useState({modele:"",description:"",photo:"",disponible:true,prix:[{s:"128Go",p:""}]});
+
+  // Lien avec le stock — calcule la disponibilité réelle
+  const getStockInfo = (modele) => {
+    const matches = stock.filter(p=>p.nom?.toLowerCase().includes(modele?.toLowerCase().split(" ").slice(0,2).join(" ").toLowerCase()));
+    const totalQte = matches.reduce((s,p)=>s+Number(p.qte),0);
+    return { qteTotal:totalQte, produits:matches, dispo:totalQte>0 };
   };
-  return (
-    <div style={{ padding:"20px 16px", maxWidth:1000, margin:"0 auto" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
-        <div style={{ fontSize:22, fontWeight:800, color:theme.text }}>💰 Catalogue des prix</div>
-        <div style={{ display:"flex", gap:8 }}>
-          <button onClick={copier} style={{ background:theme.toggleBg, border:`1px solid ${theme.border}`, color:theme.text, padding:"9px 16px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600 }}>📋 Copier tout</button>
-          <button onClick={()=>save(PRIX_DEFAUT)} style={{ background:theme.toggleBg, border:`1px solid ${theme.border}`, color:theme.textMuted, padding:"9px 16px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", fontSize:13 }}>🔄 Réinitialiser</button>
+
+  const save = (newCat) => { setCat(newCat); localStorage.setItem("angy_catalogue",JSON.stringify(newCat)); showToast("✅ Catalogue mis à jour !"); };
+  const modifierPrix = (id,i,val) => { save(cat.map(p=>p.id!==id?p:{...p,prix:p.prix.map((px,j)=>j===i?{...px,p:Number(val)}:px)})); setEditing(null); };
+  const toggleDispo = (id) => { save(cat.map(p=>p.id!==id?p:{...p,disponible:!p.disponible})); };
+  const supprimerProduit = (id) => { if(!window.confirm("Supprimer ce produit ?")) return; save(cat.filter(p=>p.id!==id)); };
+
+  const ajouterProduit = () => {
+    if(!newProd.modele) return showToast("Nom obligatoire",true);
+    const prod = {...newProd,id:Date.now(),prix:newProd.prix.filter(p=>p.s&&p.p).map(p=>({s:p.s,p:Number(p.p)}))};
+    save([...cat,prod]);
+    setNewProd({modele:"",description:"",photo:"",disponible:true,prix:[{s:"128Go",p:""}]});
+    setShowAdd(false);
+  };
+
+  const sauvegarderEdit = () => {
+    if(!editModal) return;
+    save(cat.map(p=>p.id!==editModal.id?p:editModal));
+    setEditModal(null);
+  };
+
+  const copierTout = () => {
+    const txt = cat
+      .filter(p=>filtre==="tous"||(filtre==="dispo"&&p.disponible)||(filtre==="rupture"&&!p.disponible))
+      .filter(p=>!search||p.modele.toLowerCase().includes(search.toLowerCase()))
+      .map(p=>`📱 ${p.modele}${!p.disponible?" (Rupture)":""}\n${p.prix.map(px=>`  • ${px.s} → ${px.p.toLocaleString("fr-FR")} FCFA`).join("\n")}`)
+      .join("\n\n");
+    navigator.clipboard.writeText("🏪 ANGY COMPANY — Liste des prix\n\n"+txt+"\n\n📞 +221 78 116 32 86\n✅ Authentiques · 🚚 Livraison Dakar");
+    showToast("✅ Liste copiée — prête à envoyer !");
+  };
+
+  const exporterPDF = () => {
+    const produits = cat.filter(p=>filtre==="tous"||(filtre==="dispo"&&p.disponible)||(filtre==="rupture"&&!p.disponible));
+    const html = `<html><head><title>Catalogue ANGY COMPANY</title><style>
+      body{font-family:Arial,sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#1C1C1E}
+      h1{color:#1400FF;font-size:28px;margin-bottom:4px}
+      .subtitle{color:#888;font-size:13px;margin-bottom:30px}
+      .produit{border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:14px;break-inside:avoid}
+      .produit-nom{font-size:16px;font-weight:800;color:#1C1C1E;margin-bottom:4px}
+      .produit-desc{font-size:12px;color:#888;margin-bottom:12px}
+      .rupture{background:#FFF3F3;border-color:#FFD0D0}
+      .badge-rupture{background:#FF453A;color:white;font-size:10px;padding:2px 8px;border-radius:99px;margin-left:8px}
+      .prix-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+      .prix-item{background:#F5F5F7;border-radius:8px;padding:8px 10px;text-align:center}
+      .prix-stockage{font-size:11px;color:#888;margin-bottom:3px}
+      .prix-montant{font-size:15px;font-weight:800;color:#1400FF}
+      .footer{margin-top:40px;text-align:center;font-size:12px;color:#888;border-top:1px solid #eee;padding-top:20px}
+    </style></head><body>
+    <h1>🏪 ANGY COMPANY</h1>
+    <div class="subtitle">Catalogue des prix · Dakar, Sénégal · +221 78 116 32 86</div>
+    ${produits.map(p=>`
+      <div class="produit${!p.disponible?" rupture":""}">
+        <div class="produit-nom">📱 ${p.modele}${!p.disponible?'<span class="badge-rupture">Rupture</span>':''}</div>
+        ${p.description?`<div class="produit-desc">${p.description}</div>`:""}
+        <div class="prix-grid">
+          ${p.prix.map(px=>`<div class="prix-item"><div class="prix-stockage">${px.s}</div><div class="prix-montant">${px.p.toLocaleString("fr-FR")} F</div></div>`).join("")}
         </div>
       </div>
-      <div style={{ background:"rgba(255,159,10,0.08)", border:"1px solid rgba(255,159,10,0.25)", borderRadius:10, padding:"10px 14px", marginBottom:16, fontSize:12, color:"#FF9F0A" }}>
-        💡 Appuyez sur un prix pour le modifier
+    `).join("")}
+    <div class="footer">✅ Tous nos produits sont authentiques · 🚚 Livraison sur Dakar · 💳 Wave · Orange Money · Espèces<br/>ANGY COMPANY — angycompany25@gmail.com</div>
+    </body></html>`;
+    const w=window.open("","_blank"); w.document.write(html); w.document.close(); w.print();
+  };
+
+  const filtres = cat
+    .filter(p=>filtre==="tous"||(filtre==="dispo"&&p.disponible)||(filtre==="rupture"&&!p.disponible))
+    .filter(p=>!search||p.modele.toLowerCase().includes(search.toLowerCase()));
+
+  const inp = {boxSizing:"border-box",padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.input,color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",width:"100%"};
+
+  return (
+    <div style={{padding:"20px 16px",maxWidth:1100,margin:"0 auto"}}>
+
+      {/* HEADER */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:800,color:theme.text}}>💰 Catalogue des prix</div>
+          <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>{cat.length} produits · {cat.filter(p=>p.disponible).length} disponibles</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={copierTout} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.text,padding:"9px 14px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}>📋 Copier WhatsApp</button>
+          <button onClick={exporterPDF} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.text,padding:"9px 14px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}>📄 Exporter PDF</button>
+          <button onClick={()=>save(PRIX_DEFAUT)} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"9px 14px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>🔄 Réinitialiser</button>
+          <button onClick={()=>setShowAdd(!showAdd)} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+ Ajouter produit</button>
+        </div>
       </div>
-      <div style={{ display:"grid", gap:10 }}>
-        {cat.map(p=>(
-          <div key={p.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px" }}>
-            <div style={{ fontWeight:700, fontSize:15, color:theme.text, marginBottom:10 }}>📱 {p.modele}</div>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+
+      {/* AJOUTER PRODUIT */}
+      {showAdd&&(
+        <div style={{background:"rgba(10,132,255,0.06)",border:"1px solid rgba(10,132,255,0.2)",borderRadius:16,padding:18,marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#0A84FF",marginBottom:14}}>+ Nouveau produit</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle *</label><input style={inp} value={newProd.modele} onChange={e=>setNewProd(f=>({...f,modele:e.target.value}))} placeholder="Ex: iPhone 18"/></div>
+            <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label><input style={inp} value={newProd.description} onChange={e=>setNewProd(f=>({...f,description:e.target.value}))} placeholder="Ex: Écran 6.1 · Puce A20"/></div>
+          </div>
+          <div style={{marginBottom:10}}>
+            <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Variantes de stockage & prix</label>
+            {newProd.prix.map((px,i)=>(
+              <div key={i} style={{display:"flex",gap:8,marginBottom:6}}>
+                <input style={{...inp,width:100,flex:"none"}} value={px.s} onChange={e=>{const np=[...newProd.prix];np[i]={...np[i],s:e.target.value};setNewProd(f=>({...f,prix:np}));}} placeholder="128Go"/>
+                <input type="number" style={{...inp,flex:1}} value={px.p} onChange={e=>{const np=[...newProd.prix];np[i]={...np[i],p:e.target.value};setNewProd(f=>({...f,prix:np}));}} placeholder="Prix FCFA"/>
+                {newProd.prix.length>1&&<button onClick={()=>setNewProd(f=>({...f,prix:f.prix.filter((_,j)=>j!==i)}))} style={{padding:"8px 12px",borderRadius:8,background:"rgba(255,69,58,0.1)",color:"#FF453A",border:"none",cursor:"pointer",fontWeight:700}}>✕</button>}
+              </div>
+            ))}
+            <button onClick={()=>setNewProd(f=>({...f,prix:[...f.prix,{s:"",p:""}]}))} style={{padding:"6px 14px",borderRadius:8,background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>+ Variante</button>
+          </div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:theme.text}}>
+              <input type="checkbox" checked={newProd.disponible} onChange={e=>setNewProd(f=>({...f,disponible:e.target.checked}))} style={{width:16,height:16}}/>
+              Disponible en stock
+            </label>
+            <div style={{flex:1}}/>
+            <button onClick={ajouterProduit} style={{padding:"10px 20px",borderRadius:10,background:"#0A84FF",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>✅ Ajouter</button>
+            <button onClick={()=>setShowAdd(false)} style={{padding:"10px 16px",borderRadius:10,background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {/* RECHERCHE + FILTRES */}
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher un modèle..." style={{...inp,flex:1,minWidth:160}}/>
+        {[["tous","Tous"],["dispo","✅ Disponibles"],["rupture","❌ Rupture"]].map(([id,l])=>(
+          <button key={id} onClick={()=>setFiltre(id)} style={{padding:"8px 14px",borderRadius:10,border:`1px solid ${filtre===id?"#0A84FF":theme.border}`,background:filtre===id?"rgba(10,132,255,0.12)":"transparent",color:filtre===id?"#0A84FF":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+            {l} {id==="tous"?`(${cat.length})`:id==="dispo"?`(${cat.filter(p=>p.disponible).length})`:`(${cat.filter(p=>!p.disponible).length})`}
+          </button>
+        ))}
+      </div>
+
+      <div style={{background:"rgba(255,159,10,0.08)",border:"1px solid rgba(255,159,10,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#FF9F0A"}}>
+        💡 Appuyez sur un prix pour le modifier · ✏️ pour éditer le produit · 🔘 pour changer la disponibilité
+      </div>
+
+      {/* LISTE PRODUITS */}
+      <div style={{display:"grid",gap:10}}>
+        {filtres.length===0&&<div style={{textAlign:"center",padding:"3rem",color:theme.textMuted}}>Aucun produit trouvé</div>}
+        {filtres.map(p=>{
+          const si = getStockInfo(p.modele);
+          const dispoDispo = si.qteTotal > 0;
+          return (
+          <div key={p.id} style={{background:theme.card,border:`1px solid ${dispoDispo?theme.border:"rgba(255,69,58,0.3)"}`,borderRadius:16,padding:"16px 18px",opacity:dispoDispo||p.disponible?1:0.75}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                {p.photo?(
+                  <img src={p.photo} alt={p.modele} style={{width:48,height:48,objectFit:"cover",borderRadius:10,border:`1px solid ${theme.border}`}}/>
+                ):(
+                  <div style={{width:48,height:48,borderRadius:10,background:theme.toggleBg,border:`1px solid ${theme.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📱</div>
+                )}
+                <div>
+                  <div style={{fontWeight:800,fontSize:16,color:theme.text}}>{p.modele}</div>
+                  {p.description&&<div style={{fontSize:12,color:theme.textMuted,marginTop:2}}>{p.description}</div>}
+                  {/* INFO STOCK LIÉ */}
+                  <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                    {si.qteTotal>0?(
+                      <span style={{fontSize:11,fontWeight:700,background:"rgba(48,209,88,0.12)",color:"#30D158",border:"1px solid rgba(48,209,88,0.3)",borderRadius:99,padding:"2px 8px"}}>
+                        📦 {si.qteTotal} en stock
+                      </span>
+                    ):(
+                      <span style={{fontSize:11,fontWeight:700,background:"rgba(255,69,58,0.1)",color:"#FF453A",border:"1px solid rgba(255,69,58,0.3)",borderRadius:99,padding:"2px 8px"}}>
+                        ❌ Rupture de stock
+                      </span>
+                    )}
+                    {si.produits.slice(0,2).map(sp=>(
+                      <span key={sp.id} style={{fontSize:10,color:theme.textMuted,background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:99,padding:"2px 8px"}}>
+                        {sp.nom} · {sp.qte} unité{sp.qte>1?"s":""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button onClick={()=>toggleDispo(p.id)} style={{padding:"5px 12px",borderRadius:99,border:`1px solid ${dispoDispo?"rgba(48,209,88,0.4)":"rgba(255,69,58,0.4)"}`,background:dispoDispo?"rgba(48,209,88,0.1)":"rgba(255,69,58,0.1)",color:dispoDispo?"#30D158":"#FF453A",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700}}>
+                  {dispoDispo?"✅ En stock":"❌ Rupture"}
+                </button>
+                <button onClick={()=>setEditModal({...p,prix:[...p.prix]})} style={{padding:"6px 12px",borderRadius:9,background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>✏️</button>
+                <button onClick={()=>supprimerProduit(p.id)} style={{padding:"6px 10px",borderRadius:9,background:"rgba(255,69,58,0.08)",border:"1px solid rgba(255,69,58,0.2)",color:"#FF453A",cursor:"pointer",fontFamily:"inherit",fontSize:12}}>🗑</button>
+              </div>
+            </div>
+            {/* PRIX */}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {p.prix.map((px,i)=>(
-                <div key={i} style={{ background:theme.toggleBg, border:`1px solid ${theme.border}`, borderRadius:10, padding:"8px 12px", minWidth:110 }}>
-                  <div style={{ fontSize:11, color:theme.textMuted, marginBottom:4 }}>{px.s}</div>
+                <div key={i} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"8px 14px",minWidth:110}}>
+                  <div style={{fontSize:11,color:theme.textMuted,marginBottom:4,fontWeight:600}}>{px.s}</div>
                   {editing?.id===p.id&&editing?.i===i?(
-                    <div style={{ display:"flex", gap:4 }}>
-                      <input type="number" autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")modifier(p.id,i,editVal);if(e.key==="Escape")setEditing(null);}} style={{...inp,width:80}}/>
-                      <button onClick={()=>modifier(p.id,i,editVal)} style={{ background:"#30D158", color:"#fff", border:"none", borderRadius:6, padding:"4px 8px", cursor:"pointer", fontWeight:700 }}>✅</button>
+                    <div style={{display:"flex",gap:4}}>
+                      <input type="number" autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                        onKeyDown={e=>{if(e.key==="Enter")modifierPrix(p.id,i,editVal);if(e.key==="Escape")setEditing(null);}}
+                        style={{...inp,width:80,padding:"5px 8px",fontSize:13}}/>
+                      <button onClick={()=>modifierPrix(p.id,i,editVal)} style={{background:"#30D158",color:"#fff",border:"none",borderRadius:7,padding:"5px 8px",cursor:"pointer",fontWeight:700}}>✅</button>
                     </div>
                   ):(
-                    <div onClick={()=>{setEditing({id:p.id,i});setEditVal(String(px.p));}} style={{ fontSize:15, fontWeight:800, color:"#30D158", cursor:"pointer" }}>
-                      {px.p.toLocaleString("fr-FR")} F ✏️
+                    <div onClick={()=>{setEditing({id:p.id,i});setEditVal(String(px.p));}} style={{fontSize:16,fontWeight:800,color:"#30D158",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                      {px.p.toLocaleString("fr-FR")} F <span style={{fontSize:11,color:theme.textMuted}}>✏️</span>
                     </div>
                   )}
                 </div>
               ))}
+              <div onClick={()=>{
+                const stockage=prompt("Stockage (ex: 512Go):");
+                const prix=prompt("Prix en FCFA:");
+                if(!stockage||!prix) return;
+                save(cat.map(prod=>prod.id===p.id?{...prod,prix:[...prod.prix,{s:stockage,p:Number(prix)}]}:prod));
+              }} style={{background:"rgba(10,132,255,0.05)",border:"1px dashed rgba(10,132,255,0.3)",borderRadius:10,padding:"8px 14px",minWidth:100,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                <span style={{fontSize:11,color:"#0A84FF",fontWeight:600}}>+ Variante</span>
+              </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
+
+      {/* MODAL ÉDITION COMPLÈTE */}
+      {editModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
+          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:500,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${theme.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+              <div style={{fontSize:18,fontWeight:800,color:theme.text}}>✏️ Éditer le produit</div>
+              <button onClick={()=>setEditModal(null)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:theme.textMuted}}>✕</button>
+            </div>
+            <div style={{display:"grid",gap:12}}>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle</label><input style={inp} value={editModal.modele} onChange={e=>setEditModal(f=>({...f,modele:e.target.value}))}/></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label><input style={inp} value={editModal.description||""} onChange={e=>setEditModal(f=>({...f,description:e.target.value}))} placeholder="Ex: Écran 6.1 · Puce A19"/></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>URL Photo (optionnel)</label><input style={inp} value={editModal.photo||""} onChange={e=>setEditModal(f=>({...f,photo:e.target.value}))} placeholder="https://..."/></div>
+              <div>
+                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:8}}>Prix par stockage</label>
+                {editModal.prix.map((px,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,marginBottom:8}}>
+                    <input style={{...inp,width:100,flex:"none"}} value={px.s} onChange={e=>{const np=[...editModal.prix];np[i]={...np[i],s:e.target.value};setEditModal(f=>({...f,prix:np}));}} placeholder="128Go"/>
+                    <input type="number" style={{...inp,flex:1}} value={px.p} onChange={e=>{const np=[...editModal.prix];np[i]={...np[i],p:Number(e.target.value)};setEditModal(f=>({...f,prix:np}));}} placeholder="Prix"/>
+                    {editModal.prix.length>1&&<button onClick={()=>setEditModal(f=>({...f,prix:f.prix.filter((_,j)=>j!==i)}))} style={{padding:"8px 12px",borderRadius:8,background:"rgba(255,69,58,0.1)",color:"#FF453A",border:"none",cursor:"pointer",fontWeight:700}}>✕</button>}
+                  </div>
+                ))}
+                <button onClick={()=>setEditModal(f=>({...f,prix:[...f.prix,{s:"",p:0}]}))} style={{padding:"6px 14px",borderRadius:8,background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>+ Variante</button>
+              </div>
+              <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:13,color:theme.text}}>
+                <input type="checkbox" checked={editModal.disponible} onChange={e=>setEditModal(f=>({...f,disponible:e.target.checked}))} style={{width:18,height:18}}/>
+                <span style={{fontWeight:600}}>Disponible en stock</span>
+              </label>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:20}}>
+              <button onClick={sauvegarderEdit} style={{flex:1,padding:"12px",borderRadius:12,background:"#0A84FF",color:"#fff",border:"none",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>✅ Sauvegarder</button>
+              <button onClick={()=>setEditModal(null)} style={{flex:1,padding:"12px",borderRadius:12,background:theme.toggleBg,color:theme.text,border:`1px solid ${theme.border}`,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1264,7 +1610,7 @@ export default function App() {
               )}
               {page==="depenses"  &&<Depenses  depenses={depenses} setDepenses={setDepenses} setStock={setStock} showToast={showToast} role={user?.role}/>}
               {page==="crm"       &&<CRM       showToast={showToast}/>}
-              {page==="catalogue" &&<Catalogue showToast={showToast}/>}
+              {page==="catalogue" &&<Catalogue showToast={showToast} stock={stock} setStock={setStock}/>}
               {page==="analyse"   &&<Analyse   ventes={ventes} stock={stock} depenses={depenses} factures={factures}/>}
             </>
           )}
