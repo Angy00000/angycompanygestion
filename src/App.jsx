@@ -332,7 +332,7 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
 // ─── STOCK ────────────────────────────────────────────────────────────────────
 const Stock = ({ stock, setStock, showToast, role }) => {
   const { theme } = useContext(ThemeCtx);
-  const CATS_DEFAUT = ["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"];
+  const CATS_DEFAUT = ["iPhones","Samsung Série A","Samsung Série S","Tablettes","Accessoires","Ordinateurs","Autre"];
   const [cats,setCats] = useState(()=>{ try{return JSON.parse(localStorage.getItem("angy_cats"))||CATS_DEFAUT;}catch{return CATS_DEFAUT;} });
   const [newCat,setNewCat] = useState("");
   const [showCats,setShowCats] = useState(false);
@@ -727,21 +727,40 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
 
 // CATALOGUE PRIX
 const PRIX_DEFAUT = [
-  {id:1,modele:"iPhone XR",     photo:"",description:"Écran LCD 6.1\" · Face ID · Puce A12",disponible:true, prix:[{s:"64Go",p:90000},{s:"128Go",p:100000},{s:"256Go",p:120000}]},
-  {id:2,modele:"iPhone 11",     photo:"",description:"Écran LCD 6.1\" · Double caméra · Puce A13",disponible:true, prix:[{s:"64Go",p:115000},{s:"128Go",p:120000},{s:"256Go",p:130000}]},
-  {id:3,modele:"iPhone 12",     photo:"",description:"Écran OLED 6.1\" · 5G · Puce A14",disponible:true, prix:[{s:"64Go",p:140000},{s:"128Go",p:160000},{s:"256Go",p:180000}]},
-  {id:4,modele:"iPhone 13",     photo:"",description:"Écran OLED 6.1\" · Cinematic Mode · Puce A15",disponible:true, prix:[{s:"128Go",p:190000},{s:"256Go",p:210000}]},
-  {id:5,modele:"iPhone 13 Pro Max",photo:"",description:"Écran ProMotion 120Hz · Triple caméra · Puce A15",disponible:true, prix:[{s:"128Go",p:290000},{s:"256Go",p:310000},{s:"512Go",p:340000}]},
-  {id:6,modele:"iPhone 14",     photo:"",description:"Écran OLED 6.1\" · Mode Action · Puce A15",disponible:true, prix:[{s:"128Go",p:250000},{s:"256Go",p:260000}]},
-  {id:7,modele:"iPhone 14 Pro Max",photo:"",description:"Dynamic Island · 48MP · Puce A16",disponible:true, prix:[{s:"128Go",p:370000},{s:"256Go",p:390000},{s:"512Go",p:410000}]},
-  {id:8,modele:"iPhone 15",     photo:"",description:"USB-C · 48MP · Dynamic Island · Puce A16",disponible:true, prix:[{s:"128Go",p:290000},{s:"256Go",p:310000}]},
-  {id:9,modele:"iPhone 15 Pro Max",photo:"",description:"Titane · 5x zoom · Puce A17 Pro",disponible:true, prix:[{s:"256Go",p:430000},{s:"512Go",p:450000}]},
-  {id:10,modele:"iPhone 16",    photo:"",description:"Bouton Camera · Puce A18 · USB-C",disponible:true, prix:[{s:"128Go",p:380000},{s:"256Go",p:400000}]},
-  {id:11,modele:"iPhone 16 Pro Max",photo:"",description:"Écran 6.9\" · 5x zoom · Puce A18 Pro",disponible:true, prix:[{s:"256Go",p:540000},{s:"512Go",p:560000},{s:"1To",p:580000}]},
-  {id:12,modele:"iPhone 17",    photo:"",description:"Design fin · Puce A19 · Caméra 48MP",disponible:true, prix:[{s:"256Go",p:510000},{s:"512Go",p:550000}]},
-  {id:13,modele:"iPhone 17 Air",photo:"",description:"Le plus fin jamais fait · 6.6\" · Ultra léger",disponible:true, prix:[{s:"256Go",p:590000}]},
-  {id:14,modele:"iPhone 17 Pro",photo:"",description:"Puce A19 Pro · Triple caméra Pro",disponible:true, prix:[{s:"256Go",p:660000},{s:"512Go",p:690000},{s:"1To",p:720000}]},
-  {id:15,modele:"iPhone 17 Pro Max",photo:"",description:"Le meilleur iPhone · Puce A19 Pro · 5x zoom",disponible:true, prix:[{s:"256Go",p:780000},{s:"512Go",p:830000},{s:"1To",p:870000}]},
+  {id:1,modele:"iPhone XR",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:90000},{s:"128 Go",p:100000},{s:"256 Go",p:120000}]},
+  {id:2,modele:"iPhone 11",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:115000},{s:"128 Go",p:120000},{s:"256 Go",p:130000}]},
+  {id:3,modele:"iPhone 11 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:150000},{s:"256 Go",p:165000},{s:"512 Go",p:170000}]},
+  {id:4,modele:"iPhone 11 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:165000},{s:"256 Go",p:175000},{s:"512 Go",p:190000}]},
+  {id:5,modele:"iPhone 12",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:140000},{s:"128 Go",p:160000},{s:"256 Go",p:180000}]},
+  {id:6,modele:"iPhone 12 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:185000},{s:"256 Go",p:195000}]},
+  {id:7,modele:"iPhone 12 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:230000},{s:"256 Go",p:250000}]},
+  {id:8,modele:"iPhone 13",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:190000},{s:"256 Go",p:210000}]},
+  {id:9,modele:"iPhone 13 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:240000},{s:"256 Go",p:260000}]},
+  {id:10,modele:"iPhone 13 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000},{s:"512 Go",p:340000},{s:"1 To",p:360000}]},
+  {id:11,modele:"iPhone 14",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:250000},{s:"256 Go",p:260000}]},
+  {id:12,modele:"iPhone 14 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
+  {id:13,modele:"iPhone 14 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000},{s:"512 Go",p:410000}]},
+  {id:14,modele:"iPhone 15",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
+  {id:15,modele:"iPhone 15 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000}]},
+  {id:16,modele:"iPhone 15 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:430000},{s:"512 Go",p:450000}]},
+  {id:17,modele:"iPhone 16",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:380000},{s:"256 Go",p:400000}]},
+  {id:18,modele:"iPhone 16 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:450000},{s:"512 Go",p:470000},{s:"1 To",p:490000}]},
+  {id:19,modele:"iPhone 16 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:540000},{s:"512 Go",p:560000},{s:"1 To",p:580000}]},
+  {id:20,modele:"iPhone 17",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:510000},{s:"512 Go",p:550000}]},
+  {id:21,modele:"iPhone 17 Air",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:590000}]},
+  {id:22,modele:"iPhone 17 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:660000},{s:"512 Go",p:690000},{s:"1 To",p:720000}]},
+  {id:23,modele:"iPhone 17 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:780000},{s:"512 Go",p:830000},{s:"1 To",p:870000}]},
+  {id:24,modele:"Galaxy A05",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"64 Go",p:45000},{s:"128 Go",p:55000}]},
+  {id:25,modele:"Galaxy A06",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"64 Go",p:50000},{s:"128 Go",p:60000}]},
+  {id:26,modele:"Galaxy A16 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:110000},{s:"256 Go",p:130000}]},
+  {id:27,modele:"Galaxy A26 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:155000},{s:"256 Go",p:175000}]},
+  {id:28,modele:"Galaxy A36 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:200000},{s:"256 Go",p:225000}]},
+  {id:29,modele:"Galaxy A56 5G",photo:"",description:"",cat:"Samsung Série A",disponible:true,prix:[{s:"128 Go",p:260000},{s:"256 Go",p:285000}]},
+  {id:30,modele:"Galaxy S23 Ultra",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"256 Go",p:380000},{s:"512 Go",p:420000}]},
+  {id:31,modele:"Galaxy S24 FE",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"128 Go",p:270000},{s:"256 Go",p:300000}]},
+  {id:32,modele:"Galaxy S24 Ultra",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"256 Go",p:500000},{s:"512 Go",p:555000}]},
+  {id:33,modele:"Galaxy S25",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"128 Go",p:330000},{s:"256 Go",p:360000}]},
+  {id:34,modele:"Galaxy S25 Ultra",photo:"",description:"",cat:"Samsung Série S",disponible:true,prix:[{s:"256 Go",p:570000},{s:"512 Go",p:620000},{s:"1 To",p:680000}]}
 ];
 
 const Catalogue = ({ showToast, stock=[], setStock }) => {
