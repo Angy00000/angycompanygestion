@@ -753,7 +753,16 @@ const PRIX_DEFAUT = [
 
 const Catalogue = ({ showToast, stock=[], setStock }) => {
   const { theme } = useContext(ThemeCtx);
-  const [cat,setCat] = useState(()=>{ localStorage.removeItem("angy_catalogue"); return PRIX_DEFAUT; });
+  const CATALOGUE_VERSION = "v23";
+  const [cat,setCat] = useState(()=>{ 
+    const savedVersion = localStorage.getItem("angy_catalogue_version");
+    if(savedVersion !== CATALOGUE_VERSION) {
+      localStorage.removeItem("angy_catalogue");
+      localStorage.setItem("angy_catalogue_version", CATALOGUE_VERSION);
+      return PRIX_DEFAUT;
+    }
+    try{ return JSON.parse(localStorage.getItem("angy_catalogue"))||PRIX_DEFAUT; }catch{ return PRIX_DEFAUT; }
+  });
   const [editing,setEditing] = useState(null);
   const [editVal,setEditVal] = useState("");
   const [editModal,setEditModal] = useState(null);
