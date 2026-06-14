@@ -760,8 +760,9 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
   const [editModal,setEditModal] = useState(null);
   const [search,setSearch] = useState("");
   const [filtre,setFiltre] = useState("tous");
+  const [filtreType,setFiltreType] = useState("tous");
   const [showAdd,setShowAdd] = useState(false);
-  const [newProd,setNewProd] = useState({modele:"",description:"",photo:"",disponible:true,prix:[{s:"128Go",p:""}]});
+  const [newProd,setNewProd] = useState({modele:"",description:"",photo:"",cat:"iPhones",disponible:true,prix:[{s:"128Go",p:""}]});
 
   // Lien avec le stock — calcule la disponibilité réelle
   const getStockInfo = (modele) => {
@@ -779,7 +780,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
     if(!newProd.modele) return showToast("Nom obligatoire",true);
     const prod = {...newProd,id:Date.now(),prix:newProd.prix.filter(p=>p.s&&p.p).map(p=>({s:p.s,p:Number(p.p)}))};
     save([...cat,prod]);
-    setNewProd({modele:"",description:"",photo:"",disponible:true,prix:[{s:"128Go",p:""}]});
+    setNewProd({modele:"",description:"",photo:"",cat:"iPhones",disponible:true,prix:[{s:"128Go",p:""}]});
     setShowAdd(false);
   };
 
@@ -834,6 +835,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
 
   const filtres = cat
     .filter(p=>filtre==="tous"||(filtre==="dispo"&&p.disponible)||(filtre==="rupture"&&!p.disponible))
+    .filter(p=>filtreType==="tous"||p.cat===filtreType)
     .filter(p=>!search||p.modele.toLowerCase().includes(search.toLowerCase()));
 
   const inp = {boxSizing:"border-box",padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.input,color:theme.text,fontSize:13,fontFamily:"inherit",outline:"none",width:"100%"};
@@ -862,6 +864,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
             <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle *</label><input style={inp} value={newProd.modele} onChange={e=>setNewProd(f=>({...f,modele:e.target.value}))} placeholder="Ex: iPhone 18"/></div>
             <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label><input style={inp} value={newProd.description} onChange={e=>setNewProd(f=>({...f,description:e.target.value}))} placeholder="Ex: Écran 6.1 · Puce A20"/></div>
+            <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Type / Catégorie</label><select style={inp} value={newProd.cat} onChange={e=>setNewProd(f=>({...f,cat:e.target.value}))}>{["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"].map(c=><option key={c}>{c}</option>)}</select></div>
           </div>
           <div style={{marginBottom:10}}>
             <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Variantes de stockage & prix</label>
@@ -887,11 +890,21 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
       )}
 
       {/* RECHERCHE + FILTRES */}
-      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+      <div style={{display:"flex",gap:10,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher un modèle..." style={{...inp,flex:1,minWidth:160}}/>
         {[["tous","Tous"],["dispo","✅ Disponibles"],["rupture","❌ Rupture"]].map(([id,l])=>(
           <button key={id} onClick={()=>setFiltre(id)} style={{padding:"8px 14px",borderRadius:10,border:`1px solid ${filtre===id?"#0A84FF":theme.border}`,background:filtre===id?"rgba(10,132,255,0.12)":"transparent",color:filtre===id?"#0A84FF":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
             {l} {id==="tous"?`(${cat.length})`:id==="dispo"?`(${cat.filter(p=>p.disponible).length})`:`(${cat.filter(p=>!p.disponible).length})`}
+          </button>
+        ))}
+      </div>
+
+      {/* FILTRE PAR TYPE */}
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:11,color:theme.textMuted,fontWeight:600,marginRight:2}}>Type :</span>
+        {["tous",...[...new Set(cat.map(p=>p.cat||"Autre"))].sort()].map(t=>(
+          <button key={t} onClick={()=>setFiltreType(t)} style={{padding:"6px 12px",borderRadius:99,border:`1px solid ${filtreType===t?"#FF9F0A":theme.border}`,background:filtreType===t?"rgba(255,159,10,0.12)":"transparent",color:filtreType===t?"#FF9F0A":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600}}>
+            {t==="tous"?"🗂 Tous":t} {t!=="tous"&&`(${cat.filter(p=>(p.cat||"Autre")===t).length})`}
           </button>
         ))}
       </div>
@@ -918,6 +931,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
                 <div>
                   <div style={{fontWeight:800,fontSize:16,color:theme.text}}>{p.modele}</div>
                   {p.description&&<div style={{fontSize:12,color:theme.textMuted,marginTop:2}}>{p.description}</div>}
+                  {p.cat&&<div style={{display:"inline-block",fontSize:10,fontWeight:700,background:"rgba(255,159,10,0.12)",color:"#FF9F0A",border:"1px solid rgba(255,159,10,0.3)",borderRadius:99,padding:"2px 8px",marginTop:4}}>{p.cat}</div>}
                   {/* INFO STOCK LIÉ */}
                   <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
                     {si.qteTotal>0?(
@@ -989,6 +1003,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
             <div style={{display:"grid",gap:12}}>
               <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle</label><input style={inp} value={editModal.modele} onChange={e=>setEditModal(f=>({...f,modele:e.target.value}))}/></div>
               <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label><input style={inp} value={editModal.description||""} onChange={e=>setEditModal(f=>({...f,description:e.target.value}))} placeholder="Ex: Écran 6.1 · Puce A19"/></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Type / Catégorie</label><select style={inp} value={editModal.cat||"iPhones"} onChange={e=>setEditModal(f=>({...f,cat:e.target.value}))}>{["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"].map(c=><option key={c}>{c}</option>)}</select></div>
               <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>URL Photo (optionnel)</label><input style={inp} value={editModal.photo||""} onChange={e=>setEditModal(f=>({...f,photo:e.target.value}))} placeholder="https://..."/></div>
               <div>
                 <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:8}}>Prix par stockage</label>
