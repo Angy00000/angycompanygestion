@@ -753,7 +753,7 @@ const PRIX_DEFAUT = [
 
 const Catalogue = ({ showToast, stock=[], setStock }) => {
   const { theme } = useContext(ThemeCtx);
-  const [cat,setCat] = useState(()=>{ try{ const saved=JSON.parse(localStorage.getItem("angy_catalogue")); return (saved&&saved.length>=PRIX_DEFAUT.length)?saved:PRIX_DEFAUT; }catch{return PRIX_DEFAUT;} });
+  const [cat,setCat] = useState(()=>{ try{ const saved=JSON.parse(localStorage.getItem("angy_catalogue")); if(!saved||saved.length<PRIX_DEFAUT.length){ localStorage.setItem("angy_catalogue",JSON.stringify(PRIX_DEFAUT)); return PRIX_DEFAUT; } return saved; }catch{return PRIX_DEFAUT;} });
   const [editing,setEditing] = useState(null);
   const [editVal,setEditVal] = useState("");
   const [editModal,setEditModal] = useState(null);
