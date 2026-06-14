@@ -852,6 +852,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
           <button onClick={copierTout} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.text,padding:"9px 14px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}>📋 Copier WhatsApp</button>
           <button onClick={exporterPDF} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.text,padding:"9px 14px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}>📄 Exporter PDF</button>
           <button onClick={()=>save(PRIX_DEFAUT)} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"9px 14px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>🔄 Réinitialiser</button>
+          <button onClick={()=>window.location.reload()} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,color:theme.textMuted,padding:"9px 14px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>↺ Recharger</button>
           <button onClick={()=>setShowAdd(!showAdd)} style={{background:"#0A84FF",color:"#fff",border:"none",padding:"10px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+ Ajouter produit</button>
         </div>
       </div>
