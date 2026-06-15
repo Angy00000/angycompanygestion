@@ -627,6 +627,12 @@ const Stock = ({ stock, setStock, showToast, role }) => {
   const [showCats,setShowCats] = useState(false);
   const [form,setForm] = useState({ nom:"", cat:cats[0]||"iPhones", qte:"", prix_achat:"", prix_vente:"", seuil:"3" });
   const [search,setSearch] = useState(""); const [loading,setLoading] = useState(false);
+  const [confirmDel,setConfirmDel] = useState(null);
+  const [editModal,setEditModal] = useState(null);
+
+  const supprimer = (id) => setConfirmDel(id);
+  const confirmerSuppr = async () => { await db.del("stock",confirmDel); setStock(prev=>prev.filter(x=>x.id!==confirmDel)); showToast("✅ Supprimé !"); setConfirmDel(null); };
+  const sauvegarderEdit = async () => { if(!editModal) return; await db.patch("stock",editModal.id,editModal); setStock(prev=>prev.map(x=>x.id===editModal.id?editModal:x)); showToast("✅ Modifié !"); setEditModal(null); };
 
   const saveCats = (newCats) => { setCats(newCats); localStorage.setItem("angy_cats",JSON.stringify(newCats)); };
   const ajouterCat = () => {
