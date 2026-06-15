@@ -338,7 +338,11 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
         {/* STOCK BAS */}
         <div style={{background:stockBas.length>0?"rgba(255,159,10,0.06)":theme.card,border:`1px solid ${stockBas.length>0?"rgba(255,159,10,0.3)":theme.border}`,borderRadius:20,padding:20}}>
           <div style={{fontSize:15,fontWeight:800,color:stockBas.length>0?"#FF9F0A":theme.text,marginBottom:16}}>⚠️ Stock à réapprovisionner</div>
-          {stockBas.length===0?(
+          {stock.length===0?(
+            <div style={{textAlign:"center",padding:"2rem"}}>
+              <div style={{fontSize:13,color:theme.textMuted}}>Aucun produit en stock pour le moment</div>
+            </div>
+          ):stockBas.length===0?(
             <div style={{textAlign:"center",padding:"2rem"}}>
               <div style={{fontSize:40,marginBottom:8}}>✅</div>
               <div style={{fontSize:13,color:"#30D158",fontWeight:600}}>Tout votre stock est OK !</div>
