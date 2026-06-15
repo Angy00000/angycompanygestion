@@ -714,6 +714,7 @@ const Stock = ({ stock, setStock, showToast, role }) => {
         ))}
       </div>
     </div>
+      {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
 
@@ -734,7 +735,9 @@ const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => 
     else showToast("Erreur connexion",true);
     setLoading(false);
   };
-  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("ventes",id); setVentes(prev=>prev.filter(v=>v.id!==id)); showToast("Supprimé"); };
+  const [confirmDel,setConfirmDel] = useState(null);
+  const supprimer = (id) => setConfirmDel(id);
+  const confirmerSuppr = async () => { await db.del("ventes",confirmDel); setVentes(prev=>prev.filter(v=>v.id!==confirmDel)); showToast("✅ Vente supprimée"); setConfirmDel(null); };
   const exportCSV = () => {
     const rows = ventes.map(v=>[v.date,v.produit,v.qte||1,v.prix_vente,Number(v.prix_vente)*Number(v.qte||1),v.client||"—"].join(","));
     const csv = ["Date,Produit,Qté,Prix,Total,Client",...rows].join("\n");
@@ -777,6 +780,7 @@ const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => 
         ))}
       </div>
     </div>
+      {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
 
@@ -809,7 +813,9 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
     } else showToast("Erreur",true);
     setLoading(false);
   };
-  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("depenses",id); setDepenses(prev=>prev.filter(d=>d.id!==id)); showToast("Supprimé"); };
+  const [confirmDel,setConfirmDel] = useState(null);
+  const supprimer = (id) => setConfirmDel(id);
+  const confirmerSuppr = async () => { await db.del("depenses",confirmDel); setDepenses(prev=>prev.filter(d=>d.id!==confirmDel)); showToast("✅ Dépense supprimée"); setConfirmDel(null); };
   return (
     <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
@@ -854,6 +860,7 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
         ))}
       </div>
     </div>
+      {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
 
@@ -886,7 +893,9 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
     setLoading(false);
   };
 
-  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("factures",id); setFactures(prev=>prev.filter(f=>f.id!==id)); showToast("Supprimé"); };
+  const [confirmDel,setConfirmDel] = useState(null);
+  const supprimer = (id) => setConfirmDel(id);
+  const confirmerSuppr = async () => { await db.del("factures",confirmDel); setFactures(prev=>prev.filter(f=>f.id!==confirmDel)); showToast("✅ Facture supprimée"); setConfirmDel(null); };
 
   const imprimer = (f) => {
     const lignes = JSON.parse(f.lignes||"[]");
@@ -1005,6 +1014,7 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
         ))}
       </div>
     </div>
+      {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
 
