@@ -248,7 +248,7 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
         {[
           {icon:"🛒",label:"Ventes",value:ventes.length,color:"#0A84FF",sub:"transactions"},
           {icon:"📦",label:"Produits en stock",value:stock.length,color:"#BF5AF2",sub:"références"},
-          {icon:"⚠️",label:"Stock bas",value:stockBas.length,color:stockBas.length>0?"#FF9F0A":"#30D158",sub:stockBas.length>0?"à réapprovisionner":"Tout va bien"},
+          {icon:"⚠️",label:"Stock bas",value:stock.length===0?"—":stockBas.length,color:stock.length===0?theme.textMuted:stockBas.length>0?"#FF9F0A":"#30D158",sub:stock.length===0?"Aucun produit":stockBas.length>0?"à réapprovisionner":"Tout va bien"},
         ].map(c=>(
           <div key={c.label} style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:"18px 16px",display:"flex",gap:14,alignItems:"center"}}>
             <div style={{width:48,height:48,borderRadius:14,background:`${c.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{c.icon}</div>
