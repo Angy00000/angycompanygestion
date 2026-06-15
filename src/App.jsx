@@ -246,9 +246,9 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
       {/* CARTES SECONDAIRES */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:24}}>
         {[
-          {icon:"🛒",label:"Ventes",value:ventes.length,color:"#0A84FF",sub:"transactions"},
-          {icon:"📦",label:"Produits en stock",value:stock.length,color:"#BF5AF2",sub:"références"},
-          {icon:"⚠️",label:"Stock bas",value:stock.length===0?"—":stockBas.length,color:stock.length===0?theme.textMuted:stockBas.length>0?"#FF9F0A":"#30D158",sub:stock.length===0?"Aucun produit":stockBas.length>0?"à réapprovisionner":"Tout va bien"},
+          {icon:"🛒",label:"Ventes",value:ventes.length===0?"—":ventes.length,color:ventes.length===0?theme.textMuted:"#0A84FF",sub:ventes.length===0?"Aucune vente":"transactions"},
+          {icon:"📦",label:"Produits en stock",value:stock.length===0?"—":stock.length,color:stock.length===0?theme.textMuted:"#BF5AF2",sub:stock.length===0?"Stock vide":"références"},
+          {icon:"⚠️",label:"Stock bas",value:stock.length===0?"—":stockBas.length,color:stock.length===0?theme.textMuted:stockBas.length>0?"#FF9F0A":"#30D158",sub:stock.length===0?"Ajoute du stock":stockBas.length>0?"à réapprovisionner":"Tout va bien"},
         ].map(c=>(
           <div key={c.label} style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:"18px 16px",display:"flex",gap:14,alignItems:"center"}}>
             <div style={{width:48,height:48,borderRadius:14,background:`${c.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{c.icon}</div>
