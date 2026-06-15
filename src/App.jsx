@@ -113,6 +113,20 @@ const Toast = ({ msg, err }) => (
 );
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
+const ConfirmModal = ({ msg, onOk, onCancel, theme }) => (
+  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div style={{background:theme.card,borderRadius:20,padding:28,width:"100%",maxWidth:360,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+      <div style={{fontSize:40,textAlign:"center",marginBottom:12}}>⚠️</div>
+      <div style={{fontSize:16,fontWeight:700,color:theme.text,textAlign:"center",marginBottom:8}}>Confirmer la suppression</div>
+      <div style={{fontSize:14,color:theme.textMuted,textAlign:"center",marginBottom:24,lineHeight:1.5}}>{msg}</div>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onCancel} style={{flex:1,padding:"12px",borderRadius:12,border:`1px solid ${theme.border}`,background:"transparent",color:theme.text,cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:600}}>Annuler</button>
+        <button onClick={onOk} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"#FF453A",color:"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:700}}>🗑 Supprimer</button>
+      </div>
+    </div>
+  </div>
+);
+
 const USERS = [
   { id:1, nom:"Ange Admin",  email:"admin@angy.com",      mdp:"angy2024",    role:"admin" },
   { id:2, nom:"Vendeur",     email:"vendeur@angy.com",    mdp:"vendeur2024", role:"vendeur" },
