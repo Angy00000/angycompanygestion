@@ -871,13 +871,25 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
     const d = await db.add("depenses",{ titre:form.titre, cat:form.cat, montant:Number(form.montant), date:form.date, note:form.note });
     if(d){
       setDepenses(prev=>[d,...prev]);
-      // Si option stock cochée → ajouter aussi dans le stock
-      if(form.ajouterStock && form.stockNom) {
-        const existing = setStock ? null : null; // check handled below
-        const stockData = { nom:form.stockNom||form.titre, cat:"iPhones", qte:Number(form.stockQte)||1, prix_achat:Number(form.montant)/Math.max(Number(form.stockQte),1), prix_vente:Number(form.stockPrixVente)||0, seuil:3 };
+      // Si option stock cochée → ajouter dans le stock
+      if(form.ajouterStock && form.stockNom.trim()) {
+        const qteAchetee = Number(form.stockQte)||1;
+        const prixAchat = Number(form.montant)/qteAchetee;
+        const stockData = { 
+          nom: form.stockNom.trim(), 
+          cat: "iPhones", 
+          qte: qteAchetee, 
+          prix_achat: Math.round(prixAchat), 
+          prix_vente: Number(form.stockPrixVente)||0, 
+          seuil: 3 
+        };
         const newP = await db.add("stock", stockData);
-        if(newP && setStock){ setStock(prev=>[newP,...prev]); showToast("✅ Dépense + Stock ajoutés !"); }
-        else showToast("✅ Dépense ajoutée — stock non synchronisé",true);
+        if(newP) {
+          if(setStock) setStock(prev=>[newP,...prev]);
+          showToast("✅ Dépense + produit ajouté au stock !");
+        } else {
+          showToast("✅ Dépense ajoutée mais erreur stock",true);
+        }
       } else {
         showToast("✅ Dépense ajoutée !");
       }
