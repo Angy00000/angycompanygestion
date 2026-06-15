@@ -753,6 +753,675 @@ const PRIX_DEFAUT = [
 
 const Catalogue = ({ showToast, stock=[], setStock }) => {
   const { theme } = useContext(ThemeCtx);
+
+  // VERSION : changer ce string force le reset du localStorage
+  const V = "v23";
+
+  const [cat, setCat] = useState(() => {
+    if(localStorage.getItem("cat_v") !== V) {
+      localStorage.setItem("cat_v", V);
+      localStorage.setItem("angy_cat", JSON.stringify(PRIX_DEFAUT));
+      return PRIX_DEFAUT;
+    }
+    try { return JSON.parse(localStorage.getItem("angy_cat")) || PRIX_DEFAUT; }
+    catch { return PRIX_DEFAUT; }
+  });
+
+  const [search, setSearch] = useState("");
+  const [filtre, setFiltre] = useState("tous");
+  const [editModal, setEditModal] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newProd, setNewProd] = useState({ modele:"", description:"", photo:"", cat:"iPhones", disponible:true, prix:[{s:"128 Go",p:""}] });
+
+  const inp = { width:"100%", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.inputBg, color:theme.text, fontFamily:"inherit", fontSize:14, boxSizing:"border-box" };
+
+  const save = (data) => {
+    setCat(data);
+    localStorage.setItem("angy_cat", JSON.stringify(data));
+    showToast("✅ Catalogue mis à jour !");
+  };
+
+  const toggleDispo = (id) => save(cat.map(p => p.id!==id ? p : {...p, disponible:!p.disponible}));
+  const supprimerProduit = (id) => { if(!window.confirm("Supprimer ce produit ?")) return; save(cat.filter(p=>p.id!==id)); };
+
+  const ajouterProduit = () => {
+    if(!newProd.modele.trim()) return showToast("❌ Nom obligatoire", true);
+    const prod = { ...newProd, id: Date.now(), prix: newProd.prix.filter(p=>p.s&&p.p).map(p=>({s:p.s,p:Number(String(p.p).replace(/\s/g,""))})) };
+    save([...cat, prod]);
+    setNewProd({ modele:"", description:"", photo:"", cat:"iPhones", disponible:true, prix:[{s:"128 Go",p:""}] });
+    setShowAdd(false);
+  };
+
+  const sauvegarderEdit = () => {
+    if(!editModal) return;
+    const updated = { ...editModal, prix: editModal.prix.filter(p=>p.s&&p.p).map(p=>({s:p.s,p:Number(String(p.p).replace(/\s/g,""))})) };
+    save(cat.map(p => p.id!==editModal.id ? p : updated));
+    setEditModal(null);
+  };
+
+  const handlePhoto = (e, target) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if(target === "new") setNewProd(f => ({...f, photo: ev.target.result}));
+      else setEditModal(f => ({...f, photo: ev.target.result}));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const filtres = cat
+    .filter(p => filtre==="tous" || (filtre==="dispo"&&p.disponible) || (filtre==="rupture"&&!p.disponible))
+    .filter(p => !search || p.modele.toLowerCase().includes(search.toLowerCase()));
+
+  const copierTout = () => {
+    const txt = filtres.map(p=>`📱 ${p.modele}${!p.disponible?" (Rupture)":""}\n${p.prix.map(px=>`  • ${px.s} → ${Number(px.p).toLocaleString("fr-FR")} FCFA`).join("\n")}`).join("\n\n");
+    navigator.clipboard.writeText("🏪 ANGY COMPANY — Liste des prix\n\n"+txt+"\n\n📞 +221 78 116 32 86\n✅ Authentiques · 🚚 Livraison Dakar");
+    showToast("✅ Liste copiée !");
+  };
+
+  const cardStyle = (p) => ({
+    background: theme.card,
+    border: `1px solid ${p.disponible ? theme.border : "#FF453A44"}`,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
+  });
+
+  const btnStyle = (color="#0A84FF") => ({
+    padding:"8px 14px", borderRadius:10, border:`1px solid ${color}44`,
+    background:`${color}18`, color, cursor:"pointer", fontFamily:"inherit",
+    fontSize:12, fontWeight:700
+  });
+
+  return (
+    <div style={{maxWidth:1100,margin:"0 auto",padding:"24px 16px"}}>
+
+      {/* HEADER */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginBottom:20}}>
+        <div>
+          <h2 style={{margin:0,fontSize:22,fontWeight:900,color:theme.text}}>💰 Catalogue des prix</h2>
+          <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>{cat.length} produits · {cat.filter(p=>p.disponible).length} disponibles</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={copierTout} style={btnStyle("#30D158")}>📋 Copier WhatsApp</button>
+          <button onClick={()=>{ localStorage.setItem("cat_v","reset"); save(PRIX_DEFAUT); localStorage.setItem("cat_v",V); }} style={btnStyle("#FF9F0A")}>🔄 Réinitialiser</button>
+          <button onClick={()=>setShowAdd(s=>!s)} style={{...btnStyle("#fff"),background:"#0A84FF",color:"#fff",border:"none"}}>+ Ajouter produit</button>
+        </div>
+      </div>
+
+      {/* FORMULAIRE AJOUT */}
+      {showAdd && (
+        <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:20,marginBottom:20}}>
+          <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:16}}>➕ Nouveau produit</h3>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            <div>
+              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle *</label>
+              <input style={inp} value={newProd.modele} onChange={e=>setNewProd(f=>({...f,modele:e.target.value}))} placeholder="Ex: iPhone 18"/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Catégorie</label>
+              <select style={inp} value={newProd.cat} onChange={e=>setNewProd(f=>({...f,cat:e.target.value}))}>
+                {["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"].map(c=><option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label>
+              <input style={inp} value={newProd.description} onChange={e=>setNewProd(f=>({...f,description:e.target.value}))} placeholder="Ex: Écran 6.1 · Puce A20 · Face ID"/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>📷 Photo du produit</label>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <input type="file" accept="image/*" onChange={e=>handlePhoto(e,"new")} style={{...inp,padding:"6px"}}/>
+                {newProd.photo && <img src={newProd.photo} alt="" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:`1px solid ${theme.border}`}}/>}
+              </div>
+            </div>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:8}}>Variantes de stockage & prix (FCFA)</label>
+            {newProd.prix.map((px,i)=>(
+              <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+                <input style={{...inp,flex:1}} value={px.s} onChange={e=>setNewProd(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,s:e.target.value}:p)}))} placeholder="Ex: 128 Go"/>
+                <input style={{...inp,flex:1}} type="number" value={px.p} onChange={e=>setNewProd(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,p:e.target.value}:p)}))} placeholder="Prix FCFA"/>
+                {newProd.prix.length>1&&<button onClick={()=>setNewProd(f=>({...f,prix:f.prix.filter((_,j)=>j!==i)}))} style={{background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:16}}>🗑</button>}
+              </div>
+            ))}
+            <button onClick={()=>setNewProd(f=>({...f,prix:[...f.prix,{s:"",p:""}]}))} style={{...btnStyle("#0A84FF"),marginTop:4}}>+ Variante</button>
+          </div>
+          <div style={{display:"flex",gap:8"}}>
+            <button onClick={ajouterProduit} style={{...btnStyle("#fff"),background:"#0A84FF",color:"#fff",border:"none",padding:"10px 20px"}}>✅ Ajouter</button>
+            <button onClick={()=>setShowAdd(false)} style={btnStyle("#FF453A")}>Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {/* RECHERCHE + FILTRES */}
+      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher un modèle..." style={{...inp,flex:1,minWidth:160}}/>
+        {[["tous","Tous"],["dispo","✅ Dispo"],["rupture","❌ Rupture"]].map(([id,l])=>(
+          <button key={id} onClick={()=>setFiltre(id)} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${filtre===id?"#0A84FF":theme.border}`,background:filtre===id?"rgba(10,132,255,0.12)":"transparent",color:filtre===id?"#0A84FF":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+            {l} ({id==="tous"?cat.length:id==="dispo"?cat.filter(p=>p.disponible).length:cat.filter(p=>!p.disponible).length})
+          </button>
+        ))}
+      </div>
+
+      {/* LISTE PRODUITS */}
+      {filtres.map(p => (
+        <div key={p.id} style={cardStyle(p)}>
+          <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
+            {/* PHOTO */}
+            <div style={{width:56,height:56,borderRadius:12,border:`1px solid ${theme.border}`,overflow:"hidden",flexShrink:0,background:theme.toggleBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>
+              {p.photo ? <img src={p.photo} alt={p.modele} style={{width:"100%",height:"100%",objectFit:"cover"}}/> : "📱"}
+            </div>
+            {/* INFOS */}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:17,color:theme.text}}>{p.modele}</div>
+              {p.description&&<div style={{fontSize:12,color:theme.textMuted,marginTop:2}}>{p.description}</div>}
+              {!p.disponible&&<div style={{display:"inline-block",background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:99,padding:"2px 10px",fontSize:11,fontWeight:700,marginTop:4}}>✕ Rupture de stock</div>}
+            </div>
+            {/* ACTIONS */}
+            <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button onClick={()=>toggleDispo(p.id)} title="Disponibilité" style={{background:p.disponible?"#30D15822":"#FF453A22",color:p.disponible?"#30D158":"#FF453A",border:`1px solid ${p.disponible?"#30D15844":"#FF453A44"}`,borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>
+                {p.disponible?"✅":"❌"}
+              </button>
+              <button onClick={()=>setEditModal({...p})} title="Modifier" style={{background:"#0A84FF22",color:"#0A84FF",border:"1px solid #0A84FF44",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>✏️</button>
+              <button onClick={()=>supprimerProduit(p.id)} title="Supprimer" style={{background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>🗑</button>
+            </div>
+          </div>
+          {/* PRIX */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {p.prix.map((px,i)=>(
+              <div key={i} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"8px 14px",minWidth:90,textAlign:"center"}}>
+                <div style={{fontSize:11,color:theme.textMuted,marginBottom:2}}>{px.s}</div>
+                <div style={{fontWeight:800,fontSize:15,color:"#30D158"}}>{Number(px.p).toLocaleString("fr-FR")} F</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {filtres.length===0&&<div style={{textAlign:"center",padding:40,color:theme.textMuted}}>Aucun produit trouvé</div>}
+
+      {/* MODAL EDITION */}
+      {editModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setEditModal(null)}}>
+          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
+            <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:18}}>✏️ Modifier {editModal.modele}</h3>
+            <div style={{display:"grid",gap:12,marginBottom:16}}>
+              <div>
+                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle</label>
+                <input style={inp} value={editModal.modele} onChange={e=>setEditModal(f=>({...f,modele:e.target.value}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Catégorie</label>
+                <select style={inp} value={editModal.cat||"iPhones"} onChange={e=>setEditModal(f=>({...f,cat:e.target.value}))}>
+                  {["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"].map(c=><option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label>
+                <input style={inp} value={editModal.description||""} onChange={e=>setEditModal(f=>({...f,description:e.target.value}))} placeholder="Écran · Puce · Caractéristiques"/>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>📷 Photo</label>
+                <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                  {editModal.photo&&<img src={editModal.photo} alt="" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:`1px solid ${theme.border}`}}/>}
+                  <input type="file" accept="image/*" onChange={e=>handlePhoto(e,"edit")} style={{...inp,padding:"6px"}}/>
+                  {editModal.photo&&<button onClick={()=>setEditModal(f=>({...f,photo:""}))} style={{...btnStyle("#FF453A"),padding:"6px 10px"}}>✕ Suppr.</button>}
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:8}}>Variantes & Prix (FCFA)</label>
+                {editModal.prix.map((px,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+                    <input style={{...inp,flex:1}} value={px.s} onChange={e=>setEditModal(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,s:e.target.value}:p)}))} placeholder="128 Go"/>
+                    <input style={{...inp,flex:1}} type="number" value={px.p} onChange={e=>setEditModal(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,p:e.target.value}:p)}))} placeholder="Prix"/>
+                    {editModal.prix.length>1&&<button onClick={()=>setEditModal(f=>({...f,prix:f.prix.filter((_,j)=>j!==i)}))} style={{background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:8,padding:"8px 12px",cursor:"pointer"}}>🗑</button>}
+                  </div>
+                ))}
+                <button onClick={()=>setEditModal(f=>({...f,prix:[...f.prix,{s:"",p:""}]}))} style={{...btnStyle("#0A84FF"),marginTop:4}}>+ Variante</button>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <label style={{fontSize:13,color:theme.text,fontWeight:600}}>Disponible</label>
+                <input type="checkbox" checked={editModal.disponible} onChange={e=>setEditModal(f=>({...f,disponible:e.target.checked}))} style={{width:18,height:18,cursor:"pointer"}}/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={sauvegarderEdit} style={{flex:1,padding:"12px",background:"#0A84FF",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:700}}>✅ Sauvegarder</button>
+              <button onClick={()=>setEditModal(null)} style={{padding:"12px 20px",...btnStyle("#FF453A")}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+const Stock = ({ stock, setStock, showToast, role }) => {
+  const { theme } = useContext(ThemeCtx);
+  const [cats,setCats] = useState(()=>{ try{return JSON.parse(localStorage.getItem("angy_cats"))||CATS_DEFAUT;}catch{return CATS_DEFAUT;} });
+  const [newCat,setNewCat] = useState("");
+  const [showCats,setShowCats] = useState(false);
+  const [form,setForm] = useState({ nom:"", cat:cats[0]||"iPhones", qte:"", prix_achat:"", prix_vente:"", seuil:"3" });
+  const [search,setSearch] = useState(""); const [loading,setLoading] = useState(false);
+
+  const saveCats = (newCats) => { setCats(newCats); localStorage.setItem("angy_cats",JSON.stringify(newCats)); };
+  const ajouterCat = () => {
+    if(!newCat.trim()) return;
+    if(cats.includes(newCat.trim())) return showToast("Catégorie déjà existante",true);
+    saveCats([...cats,newCat.trim()]);
+    setNewCat(""); showToast("✅ Catégorie ajoutée !");
+  };
+  const supprimerCat = (c) => {
+    if(CATS_DEFAUT.includes(c)) return showToast("Impossible de supprimer une catégorie par défaut",true);
+    saveCats(cats.filter(x=>x!==c));
+  };
+  const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
+  const filtres = stock.filter(p=>p.nom?.toLowerCase().includes(search.toLowerCase()));
+  const ajouter = async () => {
+    if(!form.nom||!form.prix_vente) return showToast("Nom et prix obligatoires",true);
+    setLoading(true);
+    const data = { nom:form.nom, cat:form.cat, qte:Number(form.qte)||0, prix_achat:Number(form.prix_achat)||0, prix_vente:Number(form.prix_vente), seuil:Number(form.seuil)||3 };
+    const p = await db.add("stock",data);
+    if(p){ setStock(prev=>[p,...prev]); showToast("✅ Produit ajouté !"); setForm({ nom:"", cat:cats[0], qte:"", prix_achat:"", prix_vente:"", seuil:"3" }); }
+    else showToast("Erreur connexion",true);
+    setLoading(false);
+  };
+  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("stock",id); setStock(prev=>prev.filter(p=>p.id!==id)); showToast("Supprimé"); };
+  const majQte = async (id,delta) => {
+    const p=stock.find(x=>x.id===id); if(!p) return;
+    const q=Math.max(0,Number(p.qte)+delta);
+    await db.patch("stock",id,{qte:q});
+    setStock(prev=>prev.map(x=>x.id===id?{...x,qte:q}:x));
+  };
+  return (
+    <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
+        <div style={{ fontSize:22, fontWeight:800, color:theme.text }}>📦 Stock</div>
+        {role==="admin"&&(
+          <button onClick={()=>setShowCats(!showCats)} style={{ background:showCats?"rgba(191,90,242,0.15)":"transparent", color:"#BF5AF2", border:"1px solid rgba(191,90,242,0.3)", padding:"9px 16px", borderRadius:10, fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
+            🏷️ Gérer les catégories
+          </button>
+        )}
+      </div>
+
+      {/* PANEL CATÉGORIES */}
+      {showCats&&role==="admin"&&(
+        <div style={{ background:"rgba(191,90,242,0.08)", border:"1px solid rgba(191,90,242,0.25)", borderRadius:14, padding:16, marginBottom:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#BF5AF2", marginBottom:12 }}>🏷️ Gérer les catégories</div>
+          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+            <input value={newCat} onChange={e=>setNewCat(e.target.value)} onKeyDown={e=>e.key==="Enter"&&ajouterCat()}
+              placeholder="Nouvelle catégorie... Ex: PlayStation, Drones"
+              style={{ flex:1, boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none" }}/>
+            <button onClick={ajouterCat} style={{ padding:"10px 18px", borderRadius:10, background:"#BF5AF2", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>✅ Ajouter</button>
+          </div>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            {cats.map(c=>(
+              <div key={c} style={{ display:"flex", alignItems:"center", gap:6, background:theme.toggleBg, border:`1px solid ${theme.border}`, borderRadius:99, padding:"6px 12px" }}>
+                <span style={{ fontSize:13, fontWeight:600, color:theme.text }}>{c}</span>
+                {!CATS_DEFAUT.includes(c)&&(
+                  <button onClick={()=>supprimerCat(c)} style={{ background:"none", border:"none", color:"#FF453A", cursor:"pointer", fontSize:14, padding:"0 2px", lineHeight:1 }}>✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {(role==="admin"||role==="vendeur")&&(
+        <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:20, marginBottom:20 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:theme.text, marginBottom:14 }}>+ Ajouter un produit</div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr 1fr auto", gap:10, alignItems:"end" }}>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Nom *</label><input style={inp} value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="iPhone 15 128Go"/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Catégorie</label><select style={inp} value={form.cat} onChange={e=>setForm(f=>({...f,cat:e.target.value}))}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Quantité</label><input type="number" style={inp} value={form.qte} onChange={e=>setForm(f=>({...f,qte:e.target.value}))} placeholder="0"/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Prix achat</label><input type="number" style={inp} value={form.prix_achat} onChange={e=>setForm(f=>({...f,prix_achat:e.target.value}))}/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Prix vente *</label><input type="number" style={inp} value={form.prix_vente} onChange={e=>setForm(f=>({...f,prix_vente:e.target.value}))}/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Seuil alerte</label><input type="number" style={inp} value={form.seuil} onChange={e=>setForm(f=>({...f,seuil:e.target.value}))}/></div>
+            <button onClick={ajouter} disabled={loading} style={{ padding:"10px 18px", borderRadius:10, background:"#0A84FF", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{loading?"⏳":"✅"}</button>
+          </div>
+        </div>
+      )}
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher..." style={{...inp, marginBottom:14, padding:"11px 14px", fontSize:14}}/>
+      <div style={{ display:"grid", gap:8 }}>
+        {filtres.length===0&&<div style={{ textAlign:"center", padding:"3rem", color:theme.textMuted }}>Aucun produit</div>}
+        {filtres.map(p=>(
+          <div key={p.id} style={{ background:theme.card, border:`1px solid ${Number(p.qte)<=Number(p.seuil||3)?"rgba(255,159,10,0.5)":theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{p.nom}</div>
+              <div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{p.cat} · Achat: {Number(p.prix_achat).toLocaleString("fr-FR")} F · Vente: {Number(p.prix_vente).toLocaleString("fr-FR")} F</div>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <button onClick={()=>majQte(p.id,-1)} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${theme.border}`, background:theme.toggleBg, color:theme.text, cursor:"pointer", fontWeight:700, fontSize:16 }}>−</button>
+              <span style={{ fontWeight:800, fontSize:18, color:Number(p.qte)<=Number(p.seuil||3)?"#FF9F0A":theme.text, minWidth:28, textAlign:"center" }}>{p.qte}</span>
+              <button onClick={()=>majQte(p.id,1)} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${theme.border}`, background:theme.toggleBg, color:theme.text, cursor:"pointer", fontWeight:700, fontSize:16 }}>+</button>
+            </div>
+            {(role==="admin"||role==="vendeur")&&<button onClick={()=>supprimer(p.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── VENTES ───────────────────────────────────────────────────────────────────
+const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => {
+  const { theme } = useContext(ThemeCtx);
+  const [form,setForm] = useState({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
+  const [loading,setLoading] = useState(false);
+  const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
+  const total = ventes.reduce((s,v)=>s+Number(v.prix_vente)*Number(v.qte||1),0);
+  const ajouter = async () => {
+    if(!form.produit||!form.prix_vente) return showToast("Produit et prix obligatoires",true);
+    setLoading(true);
+    const data = { produit:form.produit, cat:form.cat, qte:Number(form.qte)||1, prix_vente:Number(form.prix_vente), date:form.date, client:form.client||"—" };
+    const v = await db.add("ventes",data);
+    if(v){ setVentes(prev=>[v,...prev]); showToast("✅ Vente enregistrée !"); setForm({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" }); if(onVenteAdded) onVenteAdded(v); }
+    else showToast("Erreur connexion",true);
+    setLoading(false);
+  };
+  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("ventes",id); setVentes(prev=>prev.filter(v=>v.id!==id)); showToast("Supprimé"); };
+  const exportCSV = () => {
+    const rows = ventes.map(v=>[v.date,v.produit,v.qte||1,v.prix_vente,Number(v.prix_vente)*Number(v.qte||1),v.client||"—"].join(","));
+    const csv = ["Date,Produit,Qté,Prix,Total,Client",...rows].join("\n");
+    const a = document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv"})); a.download="ventes.csv"; a.click();
+  };
+  return (
+    <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
+        <div style={{ fontSize:22, fontWeight:800, color:theme.text }}>🛒 Ventes</div>
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <div style={{ background:"rgba(48,209,88,0.1)", border:"1px solid rgba(48,209,88,0.3)", borderRadius:12, padding:"10px 18px", fontWeight:700, color:"#30D158" }}>CA: {total.toLocaleString("fr-FR")} F</div>
+          <button onClick={exportCSV} style={{ background:theme.toggleBg, border:`1px solid ${theme.border}`, color:theme.text, padding:"9px 16px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600 }}>📥 CSV</button>
+        </div>
+      </div>
+      {(role==="admin"||role==="vendeur")&&(
+        <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:20, marginBottom:20 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:theme.text, marginBottom:14 }}>+ Nouvelle vente</div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr auto", gap:10, alignItems:"end" }}>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Produit *</label>
+              <select style={inp} value={form.produit} onChange={e=>{ const p=stock.find(x=>x.nom===e.target.value); setForm(f=>({...f,produit:e.target.value,cat:p?.cat||"",prix_vente:p?String(p.prix_vente):f.prix_vente})); }}>
+                <option value="">-- Choisir --</option>{stock.map(p=><option key={p.id}>{p.nom}</option>)}
+              </select>
+            </div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Qté</label><input type="number" style={inp} value={form.qte} onChange={e=>setForm(f=>({...f,qte:e.target.value}))} min="1"/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Prix vente *</label><input type="number" style={inp} value={form.prix_vente} onChange={e=>setForm(f=>({...f,prix_vente:e.target.value}))}/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Client</label><input style={inp} value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} placeholder="Optionnel"/></div>
+            <button onClick={ajouter} disabled={loading} style={{ padding:"10px 18px", borderRadius:10, background:"#30D158", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>{loading?"⏳":"✅"}</button>
+          </div>
+        </div>
+      )}
+      <div style={{ display:"grid", gap:8 }}>
+        {ventes.length===0&&<div style={{ textAlign:"center", padding:"3rem", color:theme.textMuted }}>Aucune vente</div>}
+        {ventes.map(v=>(
+          <div key={v.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{v.produit}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{v.date} · Qté: {v.qte||1} · {v.client||"—"}</div></div>
+            <div style={{ fontWeight:800, fontSize:16, color:"#30D158" }}>{(Number(v.prix_vente)*Number(v.qte||1)).toLocaleString("fr-FR")} F</div>
+            {role==="admin"&&<button onClick={()=>supprimer(v.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── DEPENSES ─────────────────────────────────────────────────────────────────
+const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
+  const { theme } = useContext(ThemeCtx);
+  const [form,setForm] = useState({ titre:"", cat:"Achat stock", montant:"", date:new Date().toISOString().slice(0,10), note:"", ajouterStock:false, stockNom:"", stockQte:"1", stockPrixVente:"" });
+  const [loading,setLoading] = useState(false);
+  const CATS = ["Achat stock","Transport","Loyer","Marketing","Salaires","Autre"];
+  const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
+  const total = depenses.reduce((s,d)=>s+Number(d.montant),0);
+  const ajouter = async () => {
+    if(!form.titre||!form.montant) return showToast("Titre et montant obligatoires",true);
+    setLoading(true);
+    const d = await db.add("depenses",{ titre:form.titre, cat:form.cat, montant:Number(form.montant), date:form.date, note:form.note });
+    if(d){
+      setDepenses(prev=>[d,...prev]);
+      // Si option stock cochée → ajouter aussi dans le stock
+      if(form.ajouterStock && form.stockNom) {
+        const existing = setStock ? null : null; // check handled below
+        const stockData = { nom:form.stockNom||form.titre, cat:"iPhones", qte:Number(form.stockQte)||1, prix_achat:Number(form.montant)/Math.max(Number(form.stockQte),1), prix_vente:Number(form.stockPrixVente)||0, seuil:3 };
+        const newP = await db.add("stock", stockData);
+        if(newP && setStock){ setStock(prev=>[newP,...prev]); showToast("✅ Dépense + Stock ajoutés !"); }
+        else showToast("✅ Dépense ajoutée — stock non synchronisé",true);
+      } else {
+        showToast("✅ Dépense ajoutée !");
+      }
+      setForm({ titre:"", cat:"Achat stock", montant:"", date:new Date().toISOString().slice(0,10), note:"", ajouterStock:false, stockNom:"", stockQte:"1", stockPrixVente:"" });
+    } else showToast("Erreur",true);
+    setLoading(false);
+  };
+  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("depenses",id); setDepenses(prev=>prev.filter(d=>d.id!==id)); showToast("Supprimé"); };
+  return (
+    <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
+        <div style={{ fontSize:22, fontWeight:800, color:theme.text }}>📤 Dépenses</div>
+        <div style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", borderRadius:12, padding:"10px 18px", fontWeight:700, color:"#FF453A" }}>Total: {total.toLocaleString("fr-FR")} F</div>
+      </div>
+      {(role==="admin"||role==="comptable")&&(
+        <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:20, marginBottom:20 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:theme.text, marginBottom:14 }}>+ Nouvelle dépense</div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr auto", gap:10, alignItems:"end" }}>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Titre *</label><input style={inp} value={form.titre} onChange={e=>setForm(f=>({...f,titre:e.target.value}))} placeholder="Ex: Achat stock"/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Catégorie</label><select style={inp} value={form.cat} onChange={e=>setForm(f=>({...f,cat:e.target.value}))}>{CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Montant *</label><input type="number" style={inp} value={form.montant} onChange={e=>setForm(f=>({...f,montant:e.target.value}))}/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
+            <button onClick={ajouter} disabled={loading} style={{ padding:"10px 18px", borderRadius:10, background:"#FF453A", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>{loading?"⏳":"✅"}</button>
+          </div>
+
+          {/* Option ajout stock */}
+          <div style={{ marginTop:12, padding:"12px 14px", background:"rgba(10,132,255,0.06)", border:`1px solid rgba(10,132,255,0.2)`, borderRadius:12 }}>
+            <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", userSelect:"none" }}>
+              <input type="checkbox" checked={form.ajouterStock} onChange={e=>setForm(f=>({...f,ajouterStock:e.target.checked}))} style={{ width:18, height:18, cursor:"pointer" }}/>
+              <span style={{ fontSize:13, fontWeight:700, color:"#0A84FF" }}>📦 Ajouter aussi dans le Stock</span>
+            </label>
+            {form.ajouterStock&&(
+              <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:10, marginTop:12 }}>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Nom du produit</label><input style={inp} value={form.stockNom} onChange={e=>setForm(f=>({...f,stockNom:e.target.value}))} placeholder={form.titre||"Ex: iPhone 15 128Go"}/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Quantité</label><input type="number" style={inp} value={form.stockQte} onChange={e=>setForm(f=>({...f,stockQte:e.target.value}))} min="1"/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Prix de vente</label><input type="number" style={inp} value={form.stockPrixVente} onChange={e=>setForm(f=>({...f,stockPrixVente:e.target.value}))} placeholder="Ex: 300000"/></div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div style={{ display:"grid", gap:8 }}>
+        {depenses.length===0&&<div style={{ textAlign:"center", padding:"3rem", color:theme.textMuted }}>Aucune dépense</div>}
+        {depenses.map(d=>(
+          <div key={d.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{d.titre}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{d.cat} · {d.date}</div></div>
+            <div style={{ fontWeight:800, fontSize:16, color:"#FF453A" }}>−{Number(d.montant).toLocaleString("fr-FR")} F</div>
+            {role==="admin"&&<button onClick={()=>supprimer(d.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── FACTURES ─────────────────────────────────────────────────────────────────
+const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill, setVentePrefill }) => {
+  const { theme } = useContext(ThemeCtx);
+  const [form,setForm] = useState({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"" });
+  const [loading,setLoading] = useState(false);
+  const [showDetails,setShowDetails] = useState({});
+
+  // Pré-remplir depuis une vente
+  useEffect(()=>{
+    if(ventePrefill){
+      setForm(f=>({...f, client:ventePrefill.client||"", lignes:[{produit:ventePrefill.produit||"",qte:ventePrefill.qte||1,prix:String(ventePrefill.prix_vente||""),imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:ventePrefill.date||f.date }));
+      setVentePrefill(null);
+    }
+  },[ventePrefill]);
+
+  const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
+  const total = form.lignes.reduce((s,l)=>s+Number(l.prix||0)*Number(l.qte||1),0);
+
+  const ajouter = async () => {
+    if(!form.client) return showToast("Nom client obligatoire",true);
+    setLoading(true);
+    const num = "FAC-"+Date.now().toString().slice(-6);
+    const f = await db.add("factures",{ numero:num, client:form.client, telephone:form.telephone, date:form.date, lignes:JSON.stringify(form.lignes), total, paiement:form.paiement, note:form.note });
+    if(f){ setFactures(prev=>[f,...prev]); showToast("✅ Facture créée !"); setForm({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"" }); }
+    else showToast("Erreur",true);
+    setLoading(false);
+  };
+
+  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("factures",id); setFactures(prev=>prev.filter(f=>f.id!==id)); showToast("Supprimé"); };
+
+  const imprimer = (f) => {
+    const lignes = JSON.parse(f.lignes||"[]");
+    const html = `<html><head><title>${f.numero}</title><style>
+      body{font-family:Arial,sans-serif;padding:40px;max-width:750px;margin:0 auto;color:#1C1C1E}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px}
+      h1{color:#1400FF;margin:0;font-size:28px}
+      .badge{background:#1400FF;color:white;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700}
+      table{width:100%;border-collapse:collapse;margin-top:20px}
+      th{background:#1400FF;color:white;padding:10px;text-align:left;font-size:13px}
+      td{padding:10px;border-bottom:1px solid #eee;font-size:13px}
+      .detail{font-size:11px;color:#888;margin-top:3px}
+      .total{font-size:20px;font-weight:bold;margin-top:20px;text-align:right;color:#1400FF}
+      .footer{margin-top:40px;font-size:11px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:16px}
+      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0;padding:16px;background:#f8f8f8;border-radius:10px}
+      .info-item label{font-size:11px;color:#888;display:block}
+      .info-item span{font-size:14px;font-weight:600}
+    </style></head><body>
+      <div class="header">
+        <div><h1>ANGY COMPANY</h1><p style="margin:4px 0;color:#666">Dakar, Sénégal · +221 78 116 32 86<br/>angycompany25@gmail.com</p></div>
+        <div><div class="badge">FACTURE</div><div style="font-size:13px;margin-top:8px;color:#666">${f.numero}<br/>${f.date}</div></div>
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><label>Client</label><span>${f.client}</span></div>
+        <div class="info-item"><label>Téléphone</label><span>${f.telephone||"—"}</span></div>
+        <div class="info-item"><label>Mode de paiement</label><span>${f.paiement}</span></div>
+        <div class="info-item"><label>Date</label><span>${f.date}</span></div>
+      </div>
+      <table>
+        <tr><th>Produit</th><th>Détails</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr>
+        ${lignes.map(l=>`<tr>
+          <td><strong>${l.produit}</strong></td>
+          <td><div class="detail">${[l.imei?"IMEI: "+l.imei:"",l.couleur?"Couleur: "+l.couleur:"",l.stockage||"",l.etat||""].filter(Boolean).join(" · ")||"—"}</div></td>
+          <td>${l.qte}</td>
+          <td>${Number(l.prix).toLocaleString("fr-FR")} F</td>
+          <td><strong>${(Number(l.prix)*Number(l.qte)).toLocaleString("fr-FR")} F</strong></td>
+        </tr>`).join("")}
+      </table>
+      <div class="total">Total : ${Number(f.total).toLocaleString("fr-FR")} FCFA</div>
+      ${f.note?`<p style="margin-top:16px;font-size:13px;color:#666"><b>Note :</b> ${f.note}</p>`:""}
+      <div class="footer">Merci pour votre confiance — ANGY COMPANY · Dakar, Sénégal<br/>Ce document tient lieu de facture</div>
+    </body></html>`;
+    const w=window.open("","_blank"); w.document.write(html); w.document.close(); w.print();
+  };
+
+  return (
+    <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
+      <div style={{ fontSize:22, fontWeight:800, color:theme.text, marginBottom:20 }}>🧾 Factures</div>
+
+      {(role==="admin"||role==="vendeur")&&(
+        <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:20, marginBottom:20 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:theme.text, marginBottom:14 }}>+ Nouvelle facture</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:10, marginBottom:14 }}>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Client *</label><input style={inp} value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} placeholder="Nom du client"/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Téléphone</label><input style={inp} value={form.telephone} onChange={e=>setForm(f=>({...f,telephone:e.target.value}))}/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
+            <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Paiement</label>
+              <select style={inp} value={form.paiement} onChange={e=>setForm(f=>({...f,paiement:e.target.value}))}>
+                {["Espèces","Wave","Orange Money","Free Money","Virement"].map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* LIGNES PRODUITS */}
+          {form.lignes.map((l,i)=>(
+            <div key={i} style={{ background:theme.toggleBg, border:`1px solid ${theme.border}`, borderRadius:12, padding:14, marginBottom:10 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr auto", gap:8, marginBottom:10 }}>
+                <div>
+                  <label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Produit</label>
+                  <select style={inp} value={l.produit} onChange={e=>{ const p=stock.find(x=>x.nom===e.target.value); const nl=[...form.lignes]; nl[i]={...nl[i],produit:e.target.value,prix:p?String(p.prix_vente):nl[i].prix}; setForm(f=>({...f,lignes:nl})); }}>
+                    <option value="">-- Choisir --</option>{stock.map(p=><option key={p.id}>{p.nom}</option>)}
+                  </select>
+                </div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Qté</label><input type="number" style={inp} value={l.qte} min="1" onChange={e=>{ const nl=[...form.lignes]; nl[i]={...nl[i],qte:Number(e.target.value)}; setForm(f=>({...f,lignes:nl})); }}/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Prix vente</label><input type="number" style={inp} value={l.prix} onChange={e=>{ const nl=[...form.lignes]; nl[i]={...nl[i],prix:e.target.value}; setForm(f=>({...f,lignes:nl})); }}/></div>
+                <button onClick={()=>setForm(f=>({...f,lignes:f.lignes.filter((_,j)=>j!==i)}))} style={{ padding:"10px", borderRadius:10, background:"rgba(255,69,58,0.1)", color:"#FF453A", border:"none", cursor:"pointer", fontWeight:700, alignSelf:"flex-end" }}>✕</button>
+              </div>
+              {/* DÉTAILS PRODUIT */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8 }}>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>📱 IMEI</label><input style={inp} value={l.imei||""} onChange={e=>{ const nl=[...form.lignes]; nl[i]={...nl[i],imei:e.target.value}; setForm(f=>({...f,lignes:nl})); }} placeholder="Ex: 352999001234567"/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>🎨 Couleur</label><input style={inp} value={l.couleur||""} onChange={e=>{ const nl=[...form.lignes]; nl[i]={...nl[i],couleur:e.target.value}; setForm(f=>({...f,lignes:nl})); }} placeholder="Ex: Noir"/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>💾 Stockage</label><input style={inp} value={l.stockage||""} onChange={e=>{ const nl=[...form.lignes]; nl[i]={...nl[i],stockage:e.target.value}; setForm(f=>({...f,lignes:nl})); }} placeholder="Ex: 128Go"/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>✨ État</label>
+                  <select style={inp} value={l.etat||"Neuf"} onChange={e=>{ const nl=[...form.lignes]; nl[i]={...nl[i],etat:e.target.value}; setForm(f=>({...f,lignes:nl})); }}>
+                    {["Neuf","Comme neuf","Très bon état","Bon état","Occasion"].map(e=><option key={e}>{e}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:4 }}>
+            <button onClick={()=>setForm(f=>({...f,lignes:[...f.lignes,{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}]}))} style={{ padding:"8px 16px", borderRadius:9, background:"rgba(10,132,255,0.1)", color:"#0A84FF", border:"1px solid rgba(10,132,255,0.3)", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600 }}>+ Ajouter une ligne</button>
+            <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+              <span style={{ fontWeight:700, color:theme.text, fontSize:15 }}>Total : {total.toLocaleString("fr-FR")} FCFA</span>
+              <button onClick={ajouter} disabled={loading} style={{ padding:"10px 20px", borderRadius:10, background:"#0A84FF", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit", fontSize:14 }}>{loading?"⏳":"✅ Créer la facture"}</button>
+            </div>
+          </div>
+
+          {/* Note */}
+          <div style={{ marginTop:12 }}>
+            <input style={inp} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="Note (optionnel) — Ex: Garantie 3 mois"/>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display:"grid", gap:8 }}>
+        {factures.length===0&&<div style={{ textAlign:"center", padding:"3rem", color:theme.textMuted }}>Aucune facture</div>}
+        {factures.map(f=>(
+          <div key={f.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{f.numero} — {f.client}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{f.date} · {f.paiement}</div></div>
+            <div style={{ fontWeight:800, fontSize:16, color:"#0A84FF" }}>{Number(f.total).toLocaleString("fr-FR")} F</div>
+            <button onClick={()=>imprimer(f)} style={{ background:"rgba(10,132,255,0.1)", border:"1px solid rgba(10,132,255,0.3)", color:"#0A84FF", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🖨 Imprimer</button>
+            {role==="admin"&&<button onClick={()=>supprimer(f.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// CATALOGUE PRIX
+const PRIX_DEFAUT = [
+  {id:1,modele:"iPhone XR",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:90000},{s:"128 Go",p:100000},{s:"256 Go",p:120000}]},
+  {id:2,modele:"iPhone 11",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:115000},{s:"128 Go",p:120000},{s:"256 Go",p:130000}]},
+  {id:3,modele:"iPhone 11 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:150000},{s:"256 Go",p:165000},{s:"512 Go",p:170000}]},
+  {id:4,modele:"iPhone 11 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:165000},{s:"256 Go",p:175000},{s:"512 Go",p:190000}]},
+  {id:5,modele:"iPhone 12",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:140000},{s:"128 Go",p:160000},{s:"256 Go",p:180000}]},
+  {id:6,modele:"iPhone 12 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:185000},{s:"256 Go",p:195000}]},
+  {id:7,modele:"iPhone 12 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:230000},{s:"256 Go",p:250000}]},
+  {id:8,modele:"iPhone 13",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:190000},{s:"256 Go",p:210000}]},
+  {id:9,modele:"iPhone 13 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:240000},{s:"256 Go",p:260000}]},
+  {id:10,modele:"iPhone 13 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000},{s:"512 Go",p:340000},{s:"1 To",p:360000}]},
+  {id:11,modele:"iPhone 14",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:250000},{s:"256 Go",p:260000}]},
+  {id:12,modele:"iPhone 14 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
+  {id:13,modele:"iPhone 14 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000},{s:"512 Go",p:410000}]},
+  {id:14,modele:"iPhone 15",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
+  {id:15,modele:"iPhone 15 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000}]},
+  {id:16,modele:"iPhone 15 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:430000},{s:"512 Go",p:450000}]},
+  {id:17,modele:"iPhone 16",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:380000},{s:"256 Go",p:400000}]},
+  {id:18,modele:"iPhone 16 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:450000},{s:"512 Go",p:470000},{s:"1 To",p:490000}]},
+  {id:19,modele:"iPhone 16 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:540000},{s:"512 Go",p:560000},{s:"1 To",p:580000}]},
+  {id:20,modele:"iPhone 17",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:510000},{s:"512 Go",p:550000}]},
+  {id:21,modele:"iPhone 17 Air",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:590000}]},
+  {id:22,modele:"iPhone 17 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:660000},{s:"512 Go",p:690000},{s:"1 To",p:720000}]},
+  {id:23,modele:"iPhone 17 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:780000},{s:"512 Go",p:830000},{s:"1 To",p:870000}]}
+];
+
+const Catalogue = ({ showToast, stock=[], setStock }) => {
+  const { theme } = useContext(ThemeCtx);
   const CATALOGUE_VERSION = "v23";
   const [cat,setCat] = useState(()=>{ 
     const savedVersion = localStorage.getItem("angy_catalogue_version");
