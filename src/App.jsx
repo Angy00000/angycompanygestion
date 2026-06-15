@@ -656,7 +656,6 @@ const Stock = ({ stock, setStock, showToast, role }) => {
     else showToast("Erreur connexion",true);
     setLoading(false);
   };
-  const supprimer = async (id) => { if(!window.confirm("Supprimer ?")) return; await db.del("stock",id); setStock(prev=>prev.filter(p=>p.id!==id)); showToast("Supprimé"); };
   const majQte = async (id,delta) => {
     const p=stock.find(x=>x.id===id); if(!p) return;
     const q=Math.max(0,Number(p.qte)+delta);
