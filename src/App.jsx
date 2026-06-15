@@ -139,6 +139,37 @@ const Login = ({ onLogin }) => {
 };
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
+
+const PRIX_DEFAUT = [
+  {id:1,modele:"iPhone XR",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:90000},{s:"128 Go",p:100000},{s:"256 Go",p:120000}]},
+  {id:2,modele:"iPhone 11",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:115000},{s:"128 Go",p:120000},{s:"256 Go",p:130000}]},
+  {id:3,modele:"iPhone 11 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:150000},{s:"256 Go",p:165000},{s:"512 Go",p:170000}]},
+  {id:4,modele:"iPhone 11 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:165000},{s:"256 Go",p:175000},{s:"512 Go",p:190000}]},
+  {id:5,modele:"iPhone 12",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:140000},{s:"128 Go",p:160000},{s:"256 Go",p:180000}]},
+  {id:6,modele:"iPhone 12 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:185000},{s:"256 Go",p:195000}]},
+  {id:7,modele:"iPhone 12 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:230000},{s:"256 Go",p:250000}]},
+  {id:8,modele:"iPhone 13",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:190000},{s:"256 Go",p:210000}]},
+  {id:9,modele:"iPhone 13 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:240000},{s:"256 Go",p:260000}]},
+  {id:10,modele:"iPhone 13 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000},{s:"512 Go",p:340000},{s:"1 To",p:360000}]},
+  {id:11,modele:"iPhone 14",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:250000},{s:"256 Go",p:260000}]},
+  {id:12,modele:"iPhone 14 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
+  {id:13,modele:"iPhone 14 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000},{s:"512 Go",p:410000}]},
+  {id:14,modele:"iPhone 15",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
+  {id:15,modele:"iPhone 15 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000}]},
+  {id:16,modele:"iPhone 15 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:430000},{s:"512 Go",p:450000}]},
+  {id:17,modele:"iPhone 16",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:380000},{s:"256 Go",p:400000}]},
+  {id:18,modele:"iPhone 16 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:450000},{s:"512 Go",p:470000},{s:"1 To",p:490000}]},
+  {id:19,modele:"iPhone 16 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:540000},{s:"512 Go",p:560000},{s:"1 To",p:580000}]},
+  {id:20,modele:"iPhone 17",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:510000},{s:"512 Go",p:550000}]},
+  {id:21,modele:"iPhone 17 Air",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:590000}]},
+  {id:22,modele:"iPhone 17 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:660000},{s:"512 Go",p:690000},{s:"1 To",p:720000}]},
+  {id:23,modele:"iPhone 17 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:780000},{s:"512 Go",p:830000},{s:"1 To",p:870000}]}
+];
+
+
+const CATS_DEFAUT = ["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"];
+
+
 const Dashboard = ({ stock, ventes, factures, depenses }) => {
   const { theme, dark } = useContext(ThemeCtx);
   const ca = ventes.reduce((s,v)=>s+Number(v.prix_vente)*Number(v.qte||1),0);
@@ -330,6 +361,7 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
 };
 
 // ─── STOCK ────────────────────────────────────────────────────────────────────
+
 const Catalogue = ({ showToast, stock=[], setStock }) => {
   const { theme } = useContext(ThemeCtx);
 
@@ -578,7 +610,6 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
 };
 
 
-const CATS_DEFAUT = ["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"];
 
 const Stock = ({ stock, setStock, showToast, role }) => {
   const { theme } = useContext(ThemeCtx);
@@ -687,6 +718,7 @@ const Stock = ({ stock, setStock, showToast, role }) => {
 };
 
 // ─── VENTES ───────────────────────────────────────────────────────────────────
+
 const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => {
   const { theme } = useContext(ThemeCtx);
   const [form,setForm] = useState({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
@@ -749,6 +781,7 @@ const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => 
 };
 
 // ─── DEPENSES ─────────────────────────────────────────────────────────────────
+
 const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
   const { theme } = useContext(ThemeCtx);
   const [form,setForm] = useState({ titre:"", cat:"Achat stock", montant:"", date:new Date().toISOString().slice(0,10), note:"", ajouterStock:false, stockNom:"", stockQte:"1", stockPrixVente:"" });
@@ -825,6 +858,7 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
 };
 
 // ─── FACTURES ─────────────────────────────────────────────────────────────────
+
 const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill, setVentePrefill }) => {
   const { theme } = useContext(ThemeCtx);
   const [form,setForm] = useState({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"" });
@@ -975,31 +1009,6 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
 };
 
 // CATALOGUE PRIX
-const PRIX_DEFAUT = [
-  {id:1,modele:"iPhone XR",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:90000},{s:"128 Go",p:100000},{s:"256 Go",p:120000}]},
-  {id:2,modele:"iPhone 11",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:115000},{s:"128 Go",p:120000},{s:"256 Go",p:130000}]},
-  {id:3,modele:"iPhone 11 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:150000},{s:"256 Go",p:165000},{s:"512 Go",p:170000}]},
-  {id:4,modele:"iPhone 11 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:165000},{s:"256 Go",p:175000},{s:"512 Go",p:190000}]},
-  {id:5,modele:"iPhone 12",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"64 Go",p:140000},{s:"128 Go",p:160000},{s:"256 Go",p:180000}]},
-  {id:6,modele:"iPhone 12 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:185000},{s:"256 Go",p:195000}]},
-  {id:7,modele:"iPhone 12 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:230000},{s:"256 Go",p:250000}]},
-  {id:8,modele:"iPhone 13",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:190000},{s:"256 Go",p:210000}]},
-  {id:9,modele:"iPhone 13 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:240000},{s:"256 Go",p:260000}]},
-  {id:10,modele:"iPhone 13 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000},{s:"512 Go",p:340000},{s:"1 To",p:360000}]},
-  {id:11,modele:"iPhone 14",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:250000},{s:"256 Go",p:260000}]},
-  {id:12,modele:"iPhone 14 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
-  {id:13,modele:"iPhone 14 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000},{s:"512 Go",p:410000}]},
-  {id:14,modele:"iPhone 15",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
-  {id:15,modele:"iPhone 15 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000}]},
-  {id:16,modele:"iPhone 15 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:430000},{s:"512 Go",p:450000}]},
-  {id:17,modele:"iPhone 16",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"128 Go",p:380000},{s:"256 Go",p:400000}]},
-  {id:18,modele:"iPhone 16 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:450000},{s:"512 Go",p:470000},{s:"1 To",p:490000}]},
-  {id:19,modele:"iPhone 16 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:540000},{s:"512 Go",p:560000},{s:"1 To",p:580000}]},
-  {id:20,modele:"iPhone 17",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:510000},{s:"512 Go",p:550000}]},
-  {id:21,modele:"iPhone 17 Air",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:590000}]},
-  {id:22,modele:"iPhone 17 Pro",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:660000},{s:"512 Go",p:690000},{s:"1 To",p:720000}]},
-  {id:23,modele:"iPhone 17 Pro Max",photo:"",description:"",cat:"iPhones",disponible:true,prix:[{s:"256 Go",p:780000},{s:"512 Go",p:830000},{s:"1 To",p:870000}]}
-];
 
 const CRM = ({ showToast }) => {
   const { theme } = useContext(ThemeCtx);
@@ -1349,6 +1358,7 @@ const CRM = ({ showToast }) => {
 };
 
 // ANALYSE & CONSEILS
+
 const Analyse = ({ ventes, stock, depenses, factures }) => {
   const { theme } = useContext(ThemeCtx);
   const [conseil, setConseil] = useState("");
@@ -1582,6 +1592,7 @@ Donne 5 conseils très pratiques et concrets pour améliorer les ventes et la re
 };
 
 // APP PRINCIPALE
+
 export default function App() {
   const [dark,setDark] = useState(window.matchMedia("(prefers-color-scheme: dark)").matches);
   const theme = dark ? DARK : LIGHT;
