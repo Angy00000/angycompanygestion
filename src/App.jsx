@@ -755,7 +755,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
   const { theme } = useContext(ThemeCtx);
 
   // VERSION : changer ce string force le reset du localStorage
-  const V = "v23";
+  const V = "v24"; // force rebuild
 
   const [cat, setCat] = useState(() => {
     if(localStorage.getItem("cat_v") !== V) {
@@ -1422,7 +1422,7 @@ const PRIX_DEFAUT = [
 
 const Catalogue = ({ showToast, stock=[], setStock }) => {
   const { theme } = useContext(ThemeCtx);
-  const CATALOGUE_VERSION = "v23";
+  const CATALOGUE_VERSION = "v24"; // force rebuild
   const [cat,setCat] = useState(()=>{ 
     const savedVersion = localStorage.getItem("angy_catalogue_version");
     if(savedVersion !== CATALOGUE_VERSION) {
