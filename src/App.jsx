@@ -709,11 +709,30 @@ const Stock = ({ stock, setStock, showToast, role }) => {
               <span style={{ fontWeight:800, fontSize:18, color:Number(p.qte)<=Number(p.seuil||3)?"#FF9F0A":theme.text, minWidth:28, textAlign:"center" }}>{p.qte}</span>
               <button onClick={()=>majQte(p.id,1)} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${theme.border}`, background:theme.toggleBg, color:theme.text, cursor:"pointer", fontWeight:700, fontSize:16 }}>+</button>
             </div>
-            {(role==="admin"||role==="vendeur")&&<button onClick={()=>supprimer(p.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+            {(role==="admin"||role==="vendeur")&&<button onClick={()=>setEditModal({...p})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(p.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
           </div>
         ))}
       </div>
     </div>
+      
+      {editModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setEditModal(null)}}>
+          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}}>
+            <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:17}}>✏️ Modifier</h3>
+            <div style={{display:"grid",gap:12,marginBottom:20}}>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.nom||""} onChange={e=>setEditModal(x=>({...x,nom:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Qte</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.qte||""} onChange={e=>setEditModal(x=>({...x,qte:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Prix achat</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.prix_achat||""} onChange={e=>setEditModal(x=>({...x,prix_achat:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Prix vente</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.prix_vente||""} onChange={e=>setEditModal(x=>({...x,prix_vente:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Seuil</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.seuil||""} onChange={e=>setEditModal(x=>({...x,seuil:e.target.value}))} /></div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={sauvegarderEdit} style={{flex:1,padding:"12px",background:"#0A84FF",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:700}}>✅ Sauvegarder</button>
+              <button onClick={()=>setEditModal(null)} style={{padding:"12px 20px",borderRadius:12,border:`1px solid ${theme.border}`,background:"transparent",color:theme.text,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
@@ -736,8 +755,16 @@ const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => 
     setLoading(false);
   };
   const [confirmDel,setConfirmDel] = useState(null);
+  const [editModal,setEditModal] = useState(null);
   const supprimer = (id) => setConfirmDel(id);
   const confirmerSuppr = async () => { await db.del("ventes",confirmDel); setVentes(prev=>prev.filter(v=>v.id!==confirmDel)); showToast("✅ Vente supprimée"); setConfirmDel(null); };
+  const sauvegarderEdit = async () => {
+    if(!editModal) return;
+    await db.patch("ventes", editModal.id, editModal);
+    setVentes(prev=>prev.map(x=>x.id===editModal.id?editModal:x));
+    showToast("\u2705 Modifi\u00e9 !");
+    setEditModal(null);
+  };
   const exportCSV = () => {
     const rows = ventes.map(v=>[v.date,v.produit,v.qte||1,v.prix_vente,Number(v.prix_vente)*Number(v.qte||1),v.client||"—"].join(","));
     const csv = ["Date,Produit,Qté,Prix,Total,Client",...rows].join("\n");
@@ -775,11 +802,30 @@ const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => 
           <div key={v.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
             <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{v.produit}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{v.date} · Qté: {v.qte||1} · {v.client||"—"}</div></div>
             <div style={{ fontWeight:800, fontSize:16, color:"#30D158" }}>{(Number(v.prix_vente)*Number(v.qte||1)).toLocaleString("fr-FR")} F</div>
-            {role==="admin"&&<button onClick={()=>supprimer(v.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+            {role==="admin"&&<button onClick={()=>setEditModal({...v})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(v.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
           </div>
         ))}
       </div>
     </div>
+      
+      {editModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setEditModal(null)}}>
+          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}}>
+            <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:17}}>✏️ Modifier</h3>
+            <div style={{display:"grid",gap:12,marginBottom:20}}>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Produit</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.produit||""} onChange={e=>setEditModal(x=>({...x,produit:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Qte</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.qte||""} onChange={e=>setEditModal(x=>({...x,qte:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Prix vente</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.prix_vente||""} onChange={e=>setEditModal(x=>({...x,prix_vente:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Client</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.client||""} onChange={e=>setEditModal(x=>({...x,client:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Date</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.date||""} onChange={e=>setEditModal(x=>({...x,date:e.target.value}))} /></div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={sauvegarderEdit} style={{flex:1,padding:"12px",background:"#0A84FF",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:700}}>✅ Sauvegarder</button>
+              <button onClick={()=>setEditModal(null)} style={{padding:"12px 20px",borderRadius:12,border:`1px solid ${theme.border}`,background:"transparent",color:theme.text,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
@@ -814,8 +860,16 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
     setLoading(false);
   };
   const [confirmDel,setConfirmDel] = useState(null);
+  const [editModal,setEditModal] = useState(null);
   const supprimer = (id) => setConfirmDel(id);
   const confirmerSuppr = async () => { await db.del("depenses",confirmDel); setDepenses(prev=>prev.filter(d=>d.id!==confirmDel)); showToast("✅ Dépense supprimée"); setConfirmDel(null); };
+  const sauvegarderEdit = async () => {
+    if(!editModal) return;
+    await db.patch("depenses", editModal.id, editModal);
+    setDepenses(prev=>prev.map(x=>x.id===editModal.id?editModal:x));
+    showToast("\u2705 Modifi\u00e9 !");
+    setEditModal(null);
+  };
   return (
     <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
@@ -855,11 +909,30 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
           <div key={d.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
             <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{d.titre}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{d.cat} · {d.date}</div></div>
             <div style={{ fontWeight:800, fontSize:16, color:"#FF453A" }}>−{Number(d.montant).toLocaleString("fr-FR")} F</div>
-            {role==="admin"&&<button onClick={()=>supprimer(d.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+            {role==="admin"&&<button onClick={()=>setEditModal({...d})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(d.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
           </div>
         ))}
       </div>
     </div>
+      
+      {editModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setEditModal(null)}}>
+          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}}>
+            <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:17}}>✏️ Modifier</h3>
+            <div style={{display:"grid",gap:12,marginBottom:20}}>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Titre</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.titre||""} onChange={e=>setEditModal(x=>({...x,titre:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Montant</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.montant||""} onChange={e=>setEditModal(x=>({...x,montant:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Cat</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.cat||""} onChange={e=>setEditModal(x=>({...x,cat:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Date</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.date||""} onChange={e=>setEditModal(x=>({...x,date:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Note</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.note||""} onChange={e=>setEditModal(x=>({...x,note:e.target.value}))} /></div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={sauvegarderEdit} style={{flex:1,padding:"12px",background:"#0A84FF",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:700}}>✅ Sauvegarder</button>
+              <button onClick={()=>setEditModal(null)} style={{padding:"12px 20px",borderRadius:12,border:`1px solid ${theme.border}`,background:"transparent",color:theme.text,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
@@ -894,8 +967,16 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
   };
 
   const [confirmDel,setConfirmDel] = useState(null);
+  const [editModal,setEditModal] = useState(null);
   const supprimer = (id) => setConfirmDel(id);
   const confirmerSuppr = async () => { await db.del("factures",confirmDel); setFactures(prev=>prev.filter(f=>f.id!==confirmDel)); showToast("✅ Facture supprimée"); setConfirmDel(null); };
+  const sauvegarderEdit = async () => {
+    if(!editModal) return;
+    await db.patch("factures", editModal.id, editModal);
+    setFactures(prev=>prev.map(x=>x.id===editModal.id?editModal:x));
+    showToast("\u2705 Modifi\u00e9 !");
+    setEditModal(null);
+  };
 
   const imprimer = (f) => {
     const lignes = JSON.parse(f.lignes||"[]");
@@ -1009,11 +1090,30 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
             <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{f.numero} — {f.client}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{f.date} · {f.paiement}</div></div>
             <div style={{ fontWeight:800, fontSize:16, color:"#0A84FF" }}>{Number(f.total).toLocaleString("fr-FR")} F</div>
             <button onClick={()=>imprimer(f)} style={{ background:"rgba(10,132,255,0.1)", border:"1px solid rgba(10,132,255,0.3)", color:"#0A84FF", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🖨 Imprimer</button>
-            {role==="admin"&&<button onClick={()=>supprimer(f.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
+            {role==="admin"&&<button onClick={()=>setEditModal({...f})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(f.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button>}
           </div>
         ))}
       </div>
     </div>
+      
+      {editModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setEditModal(null)}}>
+          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}}>
+            <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:17}}>✏️ Modifier</h3>
+            <div style={{display:"grid",gap:12,marginBottom:20}}>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Client</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.client||""} onChange={e=>setEditModal(x=>({...x,client:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Telephone</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.telephone||""} onChange={e=>setEditModal(x=>({...x,telephone:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Date</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.date||""} onChange={e=>setEditModal(x=>({...x,date:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Paiement</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.paiement||""} onChange={e=>setEditModal(x=>({...x,paiement:e.target.value}))} /></div>
+              <div><label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Note</label><input style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${theme.border}`,background:theme.toggleBg,color:theme.text,fontSize:13,fontFamily:"inherit",width:"100%",boxSizing:"border-box"}} value={editModal.note||""} onChange={e=>setEditModal(x=>({...x,note:e.target.value}))} /></div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={sauvegarderEdit} style={{flex:1,padding:"12px",background:"#0A84FF",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:700}}>✅ Sauvegarder</button>
+              <button onClick={()=>setEditModal(null)} style={{padding:"12px 20px",borderRadius:12,border:`1px solid ${theme.border}`,background:"transparent",color:theme.text,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
   );
 };
