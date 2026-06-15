@@ -752,7 +752,7 @@ const Stock = ({ stock, setStock, showToast, role }) => {
 
 // ─── VENTES ───────────────────────────────────────────────────────────────────
 
-const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => {
+const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAdded }) => {
   const { theme } = useContext(ThemeCtx);
   const [form,setForm] = useState({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
   const [loading,setLoading] = useState(false);
@@ -763,7 +763,21 @@ const Ventes = ({ ventes, setVentes, stock, showToast, role, onVenteAdded }) => 
     setLoading(true);
     const data = { produit:form.produit, cat:form.cat, qte:Number(form.qte)||1, prix_vente:Number(form.prix_vente), date:form.date, client:form.client||"—" };
     const v = await db.add("ventes",data);
-    if(v){ setVentes(prev=>[v,...prev]); showToast("✅ Vente enregistrée !"); setForm({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" }); if(onVenteAdded) onVenteAdded(v); }
+    if(v){
+      setVentes(prev=>[v,...prev]);
+      // Déduire du stock automatiquement
+      const qteVendue = Number(form.qte)||1;
+      const produitNom = form.produit.toLowerCase();
+      const stockItem = stock.find(s=>s.nom?.toLowerCase().includes(produitNom)||produitNom.includes(s.nom?.toLowerCase()));
+      if(stockItem){
+        const newQte = Math.max(0, Number(stockItem.qte) - qteVendue);
+        await db.patch("stock", stockItem.id, {qte: newQte});
+        if(setStock) setStock(prev=>prev.map(s=>s.id===stockItem.id?{...s,qte:newQte}:s));
+      }
+      showToast("✅ Vente enregistrée !");
+      setForm({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
+      if(onVenteAdded) onVenteAdded(v);
+    }
     else showToast("Erreur connexion",true);
     setLoading(false);
   };
@@ -1826,7 +1840,7 @@ export default function App() {
             <>
               {page==="dashboard" &&<Dashboard stock={stock} ventes={ventes} factures={factures} depenses={depenses}/>}
               {page==="stock"     &&<Stock     stock={stock} setStock={setStock} showToast={showToast} role={user?.role}/>}
-              {page==="ventes"    &&<Ventes    ventes={ventes} setVentes={setVentes} stock={stock} showToast={showToast} role={user?.role} onVenteAdded={(v)=>{setVentePrefill(v);setShowFacturePopup(true);}}/>}
+              {page==="ventes"    &&<Ventes    ventes={ventes} setVentes={setVentes} stock={stock} setStock={setStock} showToast={showToast} role={user?.role} onVenteAdded={(v)=>{setVentePrefill(v);setShowFacturePopup(true);}}/>}
               {page==="factures"  &&<Factures  factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} role={user?.role} ventePrefill={ventePrefill} setVentePrefill={setVentePrefill}/>}
               {/* POPUP CRÉER FACTURE */}
               {showFacturePopup&&(
