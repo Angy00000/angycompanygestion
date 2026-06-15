@@ -889,7 +889,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
             ))}
             <button onClick={()=>setNewProd(f=>({...f,prix:[...f.prix,{s:"",p:""}]}))} style={{...btnStyle("#0A84FF"),marginTop:4}}>+ Variante</button>
           </div>
-          <div style={{display:"flex",gap:8"}}>
+          <div style={{display:"flex",gap:8}}>
             <button onClick={ajouterProduit} style={{...btnStyle("#fff"),background:"#0A84FF",color:"#fff",border:"none",padding:"10px 20px"}}>✅ Ajouter</button>
             <button onClick={()=>setShowAdd(false)} style={btnStyle("#FF453A")}>Annuler</button>
           </div>
