@@ -578,6 +578,8 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
 };
 
 
+const CATS_DEFAUT = ["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"];
+
 const Stock = ({ stock, setStock, showToast, role }) => {
   const { theme } = useContext(ThemeCtx);
   const [cats,setCats] = useState(()=>{ try{return JSON.parse(localStorage.getItem("angy_cats"))||CATS_DEFAUT;}catch{return CATS_DEFAUT;} });
