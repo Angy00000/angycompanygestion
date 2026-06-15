@@ -950,6 +950,7 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
             {role==="admin"&&<><button onClick={()=>setEditModal({...d})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(d.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button></>}
           </div>
         ))}
+      </div>
       {editModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setEditModal(null)}}>
           <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto"}}>
@@ -969,7 +970,6 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
         </div>
       )}
       {confirmDel&&<ConfirmModal theme={theme} msg="Cette action est irréversible." onCancel={()=>setConfirmDel(null)} onOk={confirmerSuppr}/>}
-      </div>
     </div>
   );
 };
