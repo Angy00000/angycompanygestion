@@ -634,8 +634,9 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
 
 
 
-const Stock = ({ stock, setStock, showToast, role }) => {
+const Stock = ({ stock: stockRaw, setStock, showToast, role }) => {
   const { theme } = useContext(ThemeCtx);
+  const stock = Array.isArray(stockRaw) ? stockRaw : [];
   const [cats,setCats] = useState(()=>{ try{return JSON.parse(localStorage.getItem("angy_cats"))||CATS_DEFAUT;}catch{return CATS_DEFAUT;} });
   const [newCat,setNewCat] = useState("");
   const [showCats,setShowCats] = useState(false);
@@ -660,7 +661,7 @@ const Stock = ({ stock, setStock, showToast, role }) => {
     saveCats(cats.filter(x=>x!==c));
   };
   const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
-  const filtres = stock.filter(p=>p.nom?.toLowerCase().includes(search.toLowerCase()));
+  const filtres = stock.filter(p=>p && p.nom && p.nom.toLowerCase().includes(search.toLowerCase()));
   const ajouter = async () => {
     if(!form.nom||!form.prix_vente) return showToast("Nom et prix obligatoires",true);
     setLoading(true);
@@ -727,14 +728,14 @@ const Stock = ({ stock, setStock, showToast, role }) => {
       <div style={{ display:"grid", gap:8 }}>
         {filtres.length===0&&<div style={{ textAlign:"center", padding:"3rem", color:theme.textMuted }}>Aucun produit</div>}
         {filtres.map(p=>(
-          <div key={p.id} style={{ background:theme.card, border:`1px solid ${Number(p.qte)<=Number(p.seuil||3)?"rgba(255,159,10,0.5)":theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+          <div key={p.id} style={{ background:theme.card, border:`1px solid ${(Number(p.qte)||0)<=(Number(p.seuil)||3)?"rgba(255,159,10,0.5)":theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
             <div style={{ flex:1 }}>
               <div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{p.nom}</div>
               <div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{p.cat} · Achat: {Number(p.prix_achat).toLocaleString("fr-FR")} F · Vente: {Number(p.prix_vente).toLocaleString("fr-FR")} F</div>
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <button onClick={()=>majQte(p.id,-1)} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${theme.border}`, background:theme.toggleBg, color:theme.text, cursor:"pointer", fontWeight:700, fontSize:16 }}>−</button>
-              <span style={{ fontWeight:800, fontSize:18, color:Number(p.qte)<=Number(p.seuil||3)?"#FF9F0A":theme.text, minWidth:28, textAlign:"center" }}>{p.qte}</span>
+              <span style={{ fontWeight:800, fontSize:18, color:(Number(p.qte)||0)<=(Number(p.seuil)||3)?"#FF9F0A":theme.text, minWidth:28, textAlign:"center" }}>{p.qte}</span>
               <button onClick={()=>majQte(p.id,1)} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${theme.border}`, background:theme.toggleBg, color:theme.text, cursor:"pointer", fontWeight:700, fontSize:16 }}>+</button>
             </div>
             {(role==="admin"||role==="vendeur")&&<><button onClick={()=>setEditModal({...p})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(p.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button></>}
