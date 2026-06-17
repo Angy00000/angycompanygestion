@@ -887,11 +887,12 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
     if(d){
       setDepenses(prev=>[d,...prev]);
       // Si option stock cochée → ajouter dans le stock
-      if(form.ajouterStock && form.stockNom.trim()) {
+      if(form.ajouterStock) {
+        const nomProduit = (form.stockNom.trim() || form.titre.trim());
         const qteAchetee = Number(form.stockQte)||1;
         const prixAchat = Number(form.montant)/qteAchetee;
         const stockData = { 
-          nom: form.stockNom.trim(), 
+          nom: nomProduit, 
           cat: "iPhones", 
           qte: qteAchetee, 
           prix_achat: Math.round(prixAchat), 
