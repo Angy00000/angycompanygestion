@@ -898,19 +898,12 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
           prix_vente: Number(form.stockPrixVente)||0, 
           seuil: 3 
         };
-        try {
-          const r = await fetch(`${SURL}/rest/v1/stock`, { method:"POST", headers:H, body:JSON.stringify(stockData) });
-          const txt = await r.text();
-          if(r.ok) {
-            const j = JSON.parse(txt);
-            const newP = Array.isArray(j)?j[0]:j;
-            if(setStock) setStock(prev=>[newP,...prev]);
-            showToast("✅ Dépense + produit ajouté au stock !");
-          } else {
-            showToast("Erreur stock: "+txt.substring(0,80), true);
-          }
-        } catch(e) {
-          showToast("Erreur: "+e.message, true);
+        const newP = await db.add("stock", stockData);
+        if(newP) {
+          if(setStock) setStock(prev=>[newP,...prev]);
+          showToast("✅ Dépense + produit ajouté au stock !");
+        } else {
+          showToast("Dépense ajoutée, erreur ajout stock", true);
         }
       } else {
         showToast("✅ Dépense ajoutée !");
