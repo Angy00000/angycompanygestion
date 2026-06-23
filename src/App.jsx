@@ -69,16 +69,37 @@ const db = {
     return tempItem;
   },
   del: async (t, id) => {
-    try { await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "DELETE", headers: H }); }
-    catch { addToQueue({ type: "del", table: t, id }); }
+    try {
+      const r = await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "DELETE", headers: H });
+      if (!r.ok) {
+        const errTxt = await r.text();
+        console.error(`db.del error on ${t}:`, r.status, errTxt);
+        return { _error: true, _status: r.status, _message: errTxt };
+      }
+    } catch {
+      addToQueue({ type: "del", table: t, id });
+    }
     const cached = getLocal(t);
     saveLocal(t, cached.filter(x => x.id !== id));
+    return true;
   },
   patch: async (t, id, d) => {
-    try { await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "PATCH", headers: H, body: JSON.stringify(d) }); }
-    catch { addToQueue({ type: "patch", table: t, id, data: d }); }
-    const cached = getLocal(t);
-    saveLocal(t, cached.map(x => x.id === id ? {...x, ...d} : x));
+    try {
+      const r = await fetch(`${SURL}/rest/v1/${t}?id=eq.${id}`, { method: "PATCH", headers: H, body: JSON.stringify(d) });
+      if (!r.ok) {
+        const errTxt = await r.text();
+        console.error(`db.patch error on ${t}:`, r.status, errTxt);
+        return { _error: true, _status: r.status, _message: errTxt };
+      }
+      const cached = getLocal(t);
+      saveLocal(t, cached.map(x => x.id === id ? {...x, ...d} : x));
+      return true;
+    } catch {
+      addToQueue({ type: "patch", table: t, id, data: d });
+      const cached = getLocal(t);
+      saveLocal(t, cached.map(x => x.id === id ? {...x, ...d} : x));
+      return true;
+    }
   },
 };
 
@@ -650,8 +671,8 @@ const Stock = ({ stock: stockRaw, setStock, showToast, role }) => {
   const [editModal,setEditModal] = useState(null);
 
   const supprimer = (id) => setConfirmDel(id);
-  const confirmerSuppr = async () => { await db.del("stock",confirmDel); setStock(prev=>prev.filter(x=>x.id!==confirmDel)); showToast("✅ Supprimé !"); setConfirmDel(null); };
-  const sauvegarderEdit = async () => { if(!editModal) return; await db.patch("stock",editModal.id,editModal); setStock(prev=>prev.map(x=>x.id===editModal.id?editModal:x)); showToast("✅ Modifié !"); setEditModal(null); };
+  const confirmerSuppr = async () => { const r=await db.del("stock",confirmDel); if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true); setStock(prev=>prev.filter(x=>x.id!==confirmDel)); showToast("✅ Supprimé !"); setConfirmDel(null); };
+  const sauvegarderEdit = async () => { if(!editModal) return; const r=await db.patch("stock",editModal.id,editModal); if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true); setStock(prev=>prev.map(x=>x.id===editModal.id?editModal:x)); showToast("✅ Modifié !"); setEditModal(null); };
 
   const saveCats = (newCats) => { setCats(newCats); localStorage.setItem("angy_cats",JSON.stringify(newCats)); };
   const ajouterCat = () => {
@@ -678,7 +699,8 @@ const Stock = ({ stock: stockRaw, setStock, showToast, role }) => {
   const majQte = async (id,delta) => {
     const p=stock.find(x=>x.id===id); if(!p) return;
     const q=Math.max(0,Number(p.qte)+delta);
-    await db.patch("stock",id,{qte:q});
+    const r=await db.patch("stock",id,{qte:q});
+    if(r&&r._error)return;
     setStock(prev=>prev.map(x=>x.id===id?{...x,qte:q}:x));
   };
   return (
@@ -790,8 +812,8 @@ const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAd
       const stockItem = stock.find(s=>s.nom?.toLowerCase().includes(produitNom)||produitNom.includes(s.nom?.toLowerCase()));
       if(stockItem){
         const newQte = Math.max(0, Number(stockItem.qte) - qteVendue);
-        await db.patch("stock", stockItem.id, {qte: newQte});
-        if(setStock) setStock(prev=>prev.map(s=>s.id===stockItem.id?{...s,qte:newQte}:s));
+        const rPatch=await db.patch("stock", stockItem.id, {qte: newQte});
+        if(!(rPatch&&rPatch._error)&&setStock) setStock(prev=>prev.map(s=>s.id===stockItem.id?{...s,qte:newQte}:s));
       }
       showToast("✅ Vente enregistrée !");
       setForm({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
@@ -803,10 +825,11 @@ const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAd
   const [confirmDel,setConfirmDel] = useState(null);
   const [editModal,setEditModal] = useState(null);
   const supprimer = (id) => setConfirmDel(id);
-  const confirmerSuppr = async () => { await db.del("ventes",confirmDel); setVentes(prev=>prev.filter(v=>v.id!==confirmDel)); showToast("✅ Vente supprimée"); setConfirmDel(null); };
+  const confirmerSuppr = async () => { const r=await db.del("ventes",confirmDel); if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true); setVentes(prev=>prev.filter(v=>v.id!==confirmDel)); showToast("✅ Vente supprimée"); setConfirmDel(null); };
   const sauvegarderEdit = async () => {
     if(!editModal) return;
-    await db.patch("ventes", editModal.id, editModal);
+    const r=await db.patch("ventes", editModal.id, editModal);
+    if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true);
     setVentes(prev=>prev.map(x=>x.id===editModal.id?editModal:x));
     showToast("\u2705 Modifi\u00e9 !");
     setEditModal(null);
@@ -920,10 +943,11 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
   const [confirmDel,setConfirmDel] = useState(null);
   const [editModal,setEditModal] = useState(null);
   const supprimer = (id) => setConfirmDel(id);
-  const confirmerSuppr = async () => { await db.del("depenses",confirmDel); setDepenses(prev=>prev.filter(d=>d.id!==confirmDel)); showToast("✅ Dépense supprimée"); setConfirmDel(null); };
+  const confirmerSuppr = async () => { const r=await db.del("depenses",confirmDel); if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true); setDepenses(prev=>prev.filter(d=>d.id!==confirmDel)); showToast("✅ Dépense supprimée"); setConfirmDel(null); };
   const sauvegarderEdit = async () => {
     if(!editModal) return;
-    await db.patch("depenses", editModal.id, editModal);
+    const r=await db.patch("depenses", editModal.id, editModal);
+    if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true);
     setDepenses(prev=>prev.map(x=>x.id===editModal.id?editModal:x));
     showToast("\u2705 Modifi\u00e9 !");
     setEditModal(null);
@@ -1026,10 +1050,11 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
   const [confirmDel,setConfirmDel] = useState(null);
   const [editModal,setEditModal] = useState(null);
   const supprimer = (id) => setConfirmDel(id);
-  const confirmerSuppr = async () => { await db.del("factures",confirmDel); setFactures(prev=>prev.filter(f=>f.id!==confirmDel)); showToast("✅ Facture supprimée"); setConfirmDel(null); };
+  const confirmerSuppr = async () => { const r=await db.del("factures",confirmDel); if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true); setFactures(prev=>prev.filter(f=>f.id!==confirmDel)); showToast("✅ Facture supprimée"); setConfirmDel(null); };
   const sauvegarderEdit = async () => {
     if(!editModal) return;
-    await db.patch("factures", editModal.id, editModal);
+    const r=await db.patch("factures", editModal.id, editModal);
+    if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true);
     setFactures(prev=>prev.map(x=>x.id===editModal.id?editModal:x));
     showToast("\u2705 Modifi\u00e9 !");
     setEditModal(null);
