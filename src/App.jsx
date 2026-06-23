@@ -55,6 +55,10 @@ const db = {
         const cached = getLocal(t);
         saveLocal(t, [item, ...cached]);
         return item;
+      } else {
+        const errTxt = await r.text();
+        console.error(`db.add error on ${t}:`, r.status, errTxt);
+        return { _error: true, _status: r.status, _message: errTxt };
       }
     } catch {}
     // Offline: save to queue and return temp item
@@ -1014,8 +1018,8 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
     setLoading(true);
     const num = "FAC-"+Date.now().toString().slice(-6);
     const f = await db.add("factures",{ numero:num, client:form.client, telephone:form.telephone, date:form.date, lignes:JSON.stringify(form.lignes), total, paiement:form.paiement, note:form.note });
-    if(f){ setFactures(prev=>[f,...prev]); showToast("✅ Facture créée !"); setForm({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"" }); }
-    else showToast("Erreur",true);
+    if(f&&!f._error){ setFactures(prev=>[f,...prev]); showToast("✅ Facture créée !"); setForm({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"" }); }
+    else showToast("Erreur: "+(f?._message?.substring(0,100)||"connexion"),true);
     setLoading(false);
   };
 
