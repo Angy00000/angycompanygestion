@@ -671,8 +671,8 @@ const Stock = ({ stock: stockRaw, setStock, showToast, role }) => {
     setLoading(true);
     const data = { nom:form.nom, cat:form.cat, qte:Number(form.qte)||0, prix_achat:Number(form.prix_achat)||0, prix_vente:Number(form.prix_vente), seuil:Number(form.seuil)||3 };
     const p = await db.add("stock",data);
-    if(p){ setStock(prev=>[p,...prev]); showToast("✅ Produit ajouté !"); setForm({ nom:"", cat:cats[0], qte:"", prix_achat:"", prix_vente:"", seuil:"3" }); }
-    else showToast("Erreur connexion",true);
+    if(p&&!p._error){ setStock(prev=>[p,...prev]); showToast("✅ Produit ajouté !"); setForm({ nom:"", cat:cats[0], qte:"", prix_achat:"", prix_vente:"", seuil:"3" }); }
+    else showToast("Erreur: "+(p?._message?.substring(0,100)||"connexion"),true);
     setLoading(false);
   };
   const majQte = async (id,delta) => {
@@ -782,7 +782,7 @@ const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAd
     setLoading(true);
     const data = { produit:form.produit, cat:form.cat, qte:Number(form.qte)||1, prix_vente:Number(form.prix_vente), date:form.date, client:form.client||"—" };
     const v = await db.add("ventes",data);
-    if(v){
+    if(v&&!v._error){
       setVentes(prev=>[v,...prev]);
       // Déduire du stock automatiquement
       const qteVendue = Number(form.qte)||1;
@@ -797,7 +797,7 @@ const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAd
       setForm({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
       if(onVenteAdded) onVenteAdded(v);
     }
-    else showToast("Erreur connexion",true);
+    else showToast("Erreur: "+(v?._message?.substring(0,100)||"connexion"),true);
     setLoading(false);
   };
   const [confirmDel,setConfirmDel] = useState(null);
@@ -888,7 +888,7 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
     if(!form.titre||!form.montant) return showToast("Titre et montant obligatoires",true);
     setLoading(true);
     const d = await db.add("depenses",{ titre:form.titre, cat:form.cat, montant:Number(form.montant), date:form.date, note:form.note });
-    if(d){
+    if(d&&!d._error){
       setDepenses(prev=>[d,...prev]);
       // Si option stock cochée → ajouter dans le stock
       if(form.ajouterStock) {
@@ -904,17 +904,17 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
           seuil: 3 
         };
         const newP = await db.add("stock", stockData);
-        if(newP) {
+        if(newP&&!newP._error) {
           if(setStock) setStock(prev=>[newP,...prev]);
           showToast("✅ Dépense + produit ajouté au stock !");
         } else {
-          showToast("Dépense ajoutée, erreur ajout stock", true);
+          showToast("Dépense ajoutée, erreur stock: "+(newP?._message?.substring(0,80)||""), true);
         }
       } else {
         showToast("✅ Dépense ajoutée !");
       }
       setForm({ titre:"", cat:"Achat stock", montant:"", date:new Date().toISOString().slice(0,10), note:"", ajouterStock:false, stockNom:"", stockQte:"1", stockPrixVente:"" });
-    } else showToast("Erreur",true);
+    } else showToast("Erreur: "+(d?._message?.substring(0,100)||"connexion"),true);
     setLoading(false);
   };
   const [confirmDel,setConfirmDel] = useState(null);
