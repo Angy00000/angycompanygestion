@@ -263,9 +263,9 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
       </div>
 
       {/* CARTES PRINCIPALES — ligne 1 */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:14}}>
         {/* CA */}
-        <div style={{background:"linear-gradient(135deg,#1400FF,#0066FF)",borderRadius:20,padding:"20px 18px",color:"#fff",gridColumn:"span 1",position:"relative",overflow:"hidden"}}>
+        <div style={{background:"linear-gradient(135deg,#1400FF,#0066FF)",borderRadius:20,padding:"20px 18px",color:"#fff",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,background:"rgba(255,255,255,0.08)",borderRadius:"50%"}}/>
           <div style={{position:"absolute",right:20,bottom:-30,width:80,height:80,background:"rgba(255,255,255,0.06)",borderRadius:"50%"}}/>
           <div style={{fontSize:13,fontWeight:600,opacity:0.85,marginBottom:8}}>💰 Chiffre d'affaires</div>
@@ -284,6 +284,14 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
           <div style={{fontSize:13,fontWeight:600,color:theme.textMuted,marginBottom:8}}>📤 Dépenses</div>
           <div style={{fontSize:26,fontWeight:900,color:"#FF453A",marginBottom:4}}>{dep.toLocaleString("fr-FR")}</div>
           <div style={{fontSize:12,color:theme.textMuted}}>FCFA total</div>
+        </div>
+        {/* VALEUR STOCK */}
+        <div style={{background:"linear-gradient(135deg,#FF9F0A,#FF6B00)",borderRadius:20,padding:"20px 18px",color:"#fff",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,background:"rgba(255,255,255,0.08)",borderRadius:"50%"}}/>
+          <div style={{position:"absolute",right:20,bottom:-30,width:80,height:80,background:"rgba(255,255,255,0.06)",borderRadius:"50%"}}/>
+          <div style={{fontSize:13,fontWeight:600,opacity:0.85,marginBottom:8}}>📦 Valeur du stock</div>
+          <div style={{fontSize:26,fontWeight:900,marginBottom:4}}>{stock.reduce((s,p)=>s+Number(p.prix_vente||0)*Number(p.qte||0),0).toLocaleString("fr-FR")}</div>
+          <div style={{fontSize:12,opacity:0.75}}>Achat : {stock.reduce((s,p)=>s+Number(p.prix_achat||0)*Number(p.qte||0),0).toLocaleString("fr-FR")} FCFA</div>
         </div>
       </div>
 
@@ -712,6 +720,22 @@ const Stock = ({ stock: stockRaw, setStock, showToast, role }) => {
             🏷️ Gérer les catégories
           </button>
         )}
+      </div>
+
+      {/* BANDEAU VALEUR STOCK */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
+        <div style={{ background:"linear-gradient(135deg,#FF9F0A,#FF6B00)", borderRadius:16, padding:"18px 20px", color:"#fff", position:"relative", overflow:"hidden" }}>
+          <div style={{ position:"absolute", right:-16, top:-16, width:80, height:80, background:"rgba(255,255,255,0.08)", borderRadius:"50%" }}/>
+          <div style={{ fontSize:13, fontWeight:600, opacity:0.85, marginBottom:8 }}>📥 Valeur d'achat</div>
+          <div style={{ fontSize:24, fontWeight:900, marginBottom:4 }}>{stock.reduce((s,p)=>s+Number(p.prix_achat||0)*Number(p.qte||0),0).toLocaleString("fr-FR")}</div>
+          <div style={{ fontSize:12, opacity:0.75 }}>FCFA total en stock</div>
+        </div>
+        <div style={{ background:"linear-gradient(135deg,#1DB954,#30D158)", borderRadius:16, padding:"18px 20px", color:"#fff", position:"relative", overflow:"hidden" }}>
+          <div style={{ position:"absolute", right:-16, top:-16, width:80, height:80, background:"rgba(255,255,255,0.08)", borderRadius:"50%" }}/>
+          <div style={{ fontSize:13, fontWeight:600, opacity:0.85, marginBottom:8 }}>📤 Valeur de vente</div>
+          <div style={{ fontSize:24, fontWeight:900, marginBottom:4 }}>{stock.reduce((s,p)=>s+Number(p.prix_vente||0)*Number(p.qte||0),0).toLocaleString("fr-FR")}</div>
+          <div style={{ fontSize:12, opacity:0.75 }}>FCFA valeur potentielle</div>
+        </div>
       </div>
 
       {/* PANEL CATÉGORIES */}
