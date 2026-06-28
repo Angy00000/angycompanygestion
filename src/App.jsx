@@ -237,10 +237,11 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
 
   const MOIS_FR = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
-  // Catalogue stats depuis localStorage
+  // Catalogue stats basées sur le stock réel
   const catalogue = (() => { try { return JSON.parse(localStorage.getItem("angy_cat"))||[]; } catch { return []; } })();
-  const catDispo = catalogue.filter(p=>p.disponible).length;
-  const catRupture = catalogue.filter(p=>!p.disponible).length;
+  const qteStockPourModele = (modele) => stock.filter(s=>{ const a=s.nom?.toLowerCase(),b=modele?.toLowerCase(); return a&&b&&(a.includes(b)||b.includes(a)); }).reduce((s,x)=>s+Number(x.qte||0),0);
+  const catDispo = catalogue.filter(p=>qteStockPourModele(p.modele)>0).length;
+  const catRupture = catalogue.filter(p=>qteStockPourModele(p.modele)===0).length;
 
   return (
     <div style={{padding:"20px 16px",maxWidth:1200,margin:"0 auto"}}>
@@ -448,7 +449,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
     showToast("✅ Catalogue mis à jour !");
   };
 
-  const toggleDispo = (id) => save(cat.map(p => p.id!==id ? p : {...p, disponible:!p.disponible}));
+  const isDispo = (modele) => stock.filter(s=>{ const a=s.nom?.toLowerCase(),b=modele?.toLowerCase(); return a&&b&&(a.includes(b)||b.includes(a)); }).reduce((s,x)=>s+Number(x.qte||0),0)>0;
   const supprimerProduit = (id) => { if(!window.confirm("Supprimer ce produit ?")) return; save(cat.filter(p=>p.id!==id)); };
 
   const ajouterProduit = () => {
@@ -478,18 +479,18 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
   };
 
   const filtres = cat
-    .filter(p => filtre==="tous" || (filtre==="dispo"&&p.disponible) || (filtre==="rupture"&&!p.disponible))
+    .filter(p => filtre==="tous" || (filtre==="dispo"&&isDispo(p.modele)) || (filtre==="rupture"&&!isDispo(p.modele)))
     .filter(p => !search || p.modele.toLowerCase().includes(search.toLowerCase()));
 
   const copierTout = () => {
-    const txt = filtres.map(p=>`📱 ${p.modele}${!p.disponible?" (Rupture)":""}\n${p.prix.map(px=>`  • ${px.s} → ${Number(px.p).toLocaleString("fr-FR")} FCFA`).join("\n")}`).join("\n\n");
+    const txt = filtres.map(p=>`📱 ${p.modele}${!isDispo(p.modele)?" (Rupture)":""}\n${p.prix.map(px=>`  • ${px.s} → ${Number(px.p).toLocaleString("fr-FR")} FCFA`).join("\n")}`).join("\n\n");
     navigator.clipboard.writeText("🏪 ANGY COMPANY — Liste des prix\n\n"+txt+"\n\n📞 +221 78 116 32 86\n✅ Authentiques · 🚚 Livraison Dakar");
     showToast("✅ Liste copiée !");
   };
 
   const cardStyle = (p) => ({
     background: theme.card,
-    border: `1px solid ${p.disponible ? theme.border : "#FF453A44"}`,
+    border: `1px solid ${isDispo(p.modele) ? theme.border : "#FF453A44"}`,
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
@@ -509,7 +510,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginBottom:20}}>
         <div>
           <h2 style={{margin:0,fontSize:22,fontWeight:900,color:theme.text}}>💰 Catalogue des prix</h2>
-          <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>{cat.length} produits · {cat.filter(p=>p.disponible).length} disponibles</div>
+          <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>{cat.length} produits · {cat.filter(p=>isDispo(p.modele)).length} disponibles</div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <button onClick={copierTout} style={btnStyle("#30D158")}>📋 Copier WhatsApp</button>
@@ -568,7 +569,7 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher un modèle..." style={{...inp,flex:1,minWidth:160}}/>
         {[["tous","Tous"],["dispo","✅ Dispo"],["rupture","❌ Rupture"]].map(([id,l])=>(
           <button key={id} onClick={()=>setFiltre(id)} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${filtre===id?"#0A84FF":theme.border}`,background:filtre===id?"rgba(10,132,255,0.12)":"transparent",color:filtre===id?"#0A84FF":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
-            {l} ({id==="tous"?cat.length:id==="dispo"?cat.filter(p=>p.disponible).length:cat.filter(p=>!p.disponible).length})
+            {l} ({id==="tous"?cat.length:id==="dispo"?cat.filter(p=>isDispo(p.modele)).length:cat.filter(p=>!isDispo(p.modele)).length})
           </button>
         ))}
       </div>
@@ -585,13 +586,10 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:900,fontSize:17,color:theme.text}}>{p.modele}</div>
               {p.description&&<div style={{fontSize:12,color:theme.textMuted,marginTop:2}}>{p.description}</div>}
-              {!p.disponible&&<div style={{display:"inline-block",background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:99,padding:"2px 10px",fontSize:11,fontWeight:700,marginTop:4}}>✕ Rupture de stock</div>}
+              {!isDispo(p.modele)&&<div style={{display:"inline-block",background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:99,padding:"2px 10px",fontSize:11,fontWeight:700,marginTop:4}}>✕ Rupture de stock</div>}
             </div>
             {/* ACTIONS */}
             <div style={{display:"flex",gap:6,flexShrink:0}}>
-              <button onClick={()=>toggleDispo(p.id)} title="Disponibilité" style={{background:p.disponible?"#30D15822":"#FF453A22",color:p.disponible?"#30D158":"#FF453A",border:`1px solid ${p.disponible?"#30D15844":"#FF453A44"}`,borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>
-                {p.disponible?"✅":"❌"}
-              </button>
               <button onClick={()=>setEditModal({...p})} title="Modifier" style={{background:"#0A84FF22",color:"#0A84FF",border:"1px solid #0A84FF44",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>✏️</button>
               <button onClick={()=>supprimerProduit(p.id)} title="Supprimer" style={{background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>🗑</button>
             </div>
@@ -648,10 +646,6 @@ const Catalogue = ({ showToast, stock=[], setStock }) => {
                   </div>
                 ))}
                 <button onClick={()=>setEditModal(f=>({...f,prix:[...f.prix,{s:"",p:""}]}))} style={{...btnStyle("#0A84FF"),marginTop:4}}>+ Variante</button>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <label style={{fontSize:13,color:theme.text,fontWeight:600}}>Disponible</label>
-                <input type="checkbox" checked={editModal.disponible} onChange={e=>setEditModal(f=>({...f,disponible:e.target.checked}))} style={{width:18,height:18,cursor:"pointer"}}/>
               </div>
             </div>
             <div style={{display:"flex",gap:8}}>
