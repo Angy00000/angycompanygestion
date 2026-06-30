@@ -1,5 +1,14 @@
 import { useState, useEffect, useContext, createContext, useRef } from "react";
 
+// ─── SHIM localStorage (artifacts n'autorisent pas le vrai localStorage du navigateur) ──
+const _mem = {};
+const localStorage = {
+  getItem: (k) => (k in _mem ? _mem[k] : null),
+  setItem: (k, v) => { _mem[k] = String(v); },
+  removeItem: (k) => { delete _mem[k]; },
+};
+
+
 // ─── CONFIG SUPABASE ──────────────────────────────────────────────────────────
 const SURL = "https://nfpnhyvuwpzezwbmxtgd.supabase.co";
 const SKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mcG5oeXZ1d3B6ZXp3Ym14dGdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODU5NTAsImV4cCI6MjA5NjE2MTk1MH0.u9ptkVSXwgT75m9WgRLsUnygEJGYK4ESyv6jBUeNtO4";
@@ -179,45 +188,9 @@ const Login = ({ onLogin }) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
-const PRIX_DEFAUT = [
-  {id:1,modele:"iPhone XR",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"64 Go",p:90000},{s:"128 Go",p:100000},{s:"256 Go",p:120000}]},
-  {id:2,modele:"iPhone 11",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"64 Go",p:115000},{s:"128 Go",p:120000},{s:"256 Go",p:130000}]},
-  {id:3,modele:"iPhone 11 Pro",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"64 Go",p:150000},{s:"256 Go",p:165000},{s:"512 Go",p:170000}]},
-  {id:4,modele:"iPhone 11 Pro Max",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"64 Go",p:165000},{s:"256 Go",p:175000},{s:"512 Go",p:190000}]},
-  {id:5,modele:"iPhone 12",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"64 Go",p:140000},{s:"128 Go",p:160000},{s:"256 Go",p:180000}]},
-  {id:6,modele:"iPhone 12 Pro",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:185000},{s:"256 Go",p:195000}]},
-  {id:7,modele:"iPhone 12 Pro Max",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:230000},{s:"256 Go",p:250000}]},
-  {id:8,modele:"iPhone 13",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:190000},{s:"256 Go",p:210000}]},
-  {id:9,modele:"iPhone 13 Pro",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:240000},{s:"256 Go",p:260000}]},
-  {id:10,modele:"iPhone 13 Pro Max",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000},{s:"512 Go",p:340000},{s:"1 To",p:360000}]},
-  {id:11,modele:"iPhone 14",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:250000},{s:"256 Go",p:260000}]},
-  {id:12,modele:"iPhone 14 Pro",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
-  {id:13,modele:"iPhone 14 Pro Max",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000},{s:"512 Go",p:410000}]},
-  {id:14,modele:"iPhone 15",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:290000},{s:"256 Go",p:310000}]},
-  {id:15,modele:"iPhone 15 Pro",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:370000},{s:"256 Go",p:390000}]},
-  {id:16,modele:"iPhone 15 Pro Max",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"256 Go",p:430000},{s:"512 Go",p:450000}]},
-  {id:17,modele:"iPhone 16",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"128 Go",p:380000},{s:"256 Go",p:400000}]},
-  {id:18,modele:"iPhone 16 Pro",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"256 Go",p:450000},{s:"512 Go",p:470000},{s:"1 To",p:490000}]},
-  {id:19,modele:"iPhone 16 Pro Max",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"256 Go",p:540000},{s:"512 Go",p:560000},{s:"1 To",p:580000}]},
-  {id:20,modele:"iPhone 17",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"256 Go",p:510000},{s:"512 Go",p:550000}]},
-  {id:21,modele:"iPhone 17 Air",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"256 Go",p:590000}]},
-  {id:22,modele:"iPhone 17 Pro",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"256 Go",p:660000},{s:"512 Go",p:690000},{s:"1 To",p:720000}]},
-  {id:23,modele:"iPhone 17 Pro Max",photo:"",description:"",cat:"iPhones",disponible:false,prix:[{s:"256 Go",p:780000},{s:"512 Go",p:830000},{s:"1 To",p:870000}]}
-];
-
 
 const CATS_DEFAUT = ["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"];
 
-
-// Calcule la quantité dispo en Stock pour un modèle de Catalogue (match partiel insensible à la casse)
-const stockQtePourModele = (modele, stock) => {
-  if(!modele || !Array.isArray(stock)) return 0;
-  const m = modele.toLowerCase().trim();
-  return stock
-    .filter(s => s.nom && (s.nom.toLowerCase().includes(m) || m.includes(s.nom.toLowerCase())))
-    .reduce((sum,s) => sum + Number(s.qte||0), 0);
-};
-const estDisponibleEnStock = (modele, stock) => stockQtePourModele(modele, stock) > 0;
 
 const Dashboard = ({ stock, ventes, factures, depenses }) => {
   const { theme, dark } = useContext(ThemeCtx);
@@ -247,10 +220,7 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
 
   const MOIS_FR = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
-  // Catalogue stats : disponibilité calculée dynamiquement depuis le Stock réel
-  const catalogue = (() => { try { return JSON.parse(localStorage.getItem("angy_cat"))||[]; } catch { return []; } })();
-  const catDispo = catalogue.filter(p=>estDisponibleEnStock(p.modele, stock)).length;
-  const catRupture = catalogue.length - catDispo;
+
 
   return (
     <div style={{padding:"20px 16px",maxWidth:1200,margin:"0 auto"}}>
@@ -309,8 +279,8 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:24}}>
         {[
           {icon:"🛒",label:"Ventes",value:ventes.length===0?"—":ventes.length,color:ventes.length===0?theme.textMuted:"#0A84FF",sub:ventes.length===0?"Aucune vente":"transactions"},
-          {icon:"✅",label:"Modèles dispo",value:catalogue.length===0?"—":catDispo,color:catDispo===0?theme.textMuted:"#30D158",sub:catalogue.length===0?"Catalogue vide":catDispo===0?"Aucun dispo":"modèles en stock"},
-          {icon:"❌",label:"En rupture",value:catalogue.length===0?"—":catRupture,color:catRupture===0?"#30D158":"#FF453A",sub:catalogue.length===0?"—":catRupture===0?"Tout est dispo":"modèles indisponibles"},
+          {icon:"📦",label:"Articles en stock",value:stock.length===0?"—":stock.reduce((s,p)=>s+Number(p.qte||0),0),color:stock.length===0?theme.textMuted:"#0A84FF",sub:stock.length===0?"Stock vide":`${stock.length} références`},
+          {icon:"⚠️",label:"Stock bas",value:stockBas.length,color:stockBas.length===0?"#30D158":"#FF9F0A",sub:stockBas.length===0?"Tout est ok":"à réapprovisionner"},
         ].map(c=>(
           <div key={c.label} style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:20,padding:"18px 16px",display:"flex",gap:14,alignItems:"center"}}>
             <div style={{width:48,height:48,borderRadius:14,background:`${c.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{c.icon}</div>
@@ -428,256 +398,6 @@ const Dashboard = ({ stock, ventes, factures, depenses }) => {
 
 // ─── STOCK ────────────────────────────────────────────────────────────────────
 
-const Catalogue = ({ showToast, stock=[], setStock }) => {
-  const { theme } = useContext(ThemeCtx);
-
-  // VERSION : changer ce string force le reset du localStorage
-  const V = "v25"; // force rebuild
-
-  const [cat, setCat] = useState(() => {
-    if(localStorage.getItem("cat_v") !== V) {
-      localStorage.setItem("cat_v", V);
-      localStorage.setItem("angy_cat", JSON.stringify(PRIX_DEFAUT));
-      return PRIX_DEFAUT;
-    }
-    try { return JSON.parse(localStorage.getItem("angy_cat")) || PRIX_DEFAUT; }
-    catch { return PRIX_DEFAUT; }
-  });
-
-  const [search, setSearch] = useState("");
-  const [filtre, setFiltre] = useState("tous");
-  const [editModal, setEditModal] = useState(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newProd, setNewProd] = useState({ modele:"", description:"", photo:"", cat:"iPhones", disponible:true, prix:[{s:"128 Go",p:""}] });
-
-  const inp = { width:"100%", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.inputBg, color:theme.text, fontFamily:"inherit", fontSize:14, boxSizing:"border-box" };
-
-  // Disponibilité calculée dynamiquement depuis le Stock (qte réelle > 0), plus de flag manuel
-  const isDispo = (p) => estDisponibleEnStock(p.modele, stock);
-
-  const save = (data) => {
-    setCat(data);
-    localStorage.setItem("angy_cat", JSON.stringify(data));
-    showToast("✅ Catalogue mis à jour !");
-  };
-
-  const supprimerProduit = (id) => { if(!window.confirm("Supprimer ce produit ?")) return; save(cat.filter(p=>p.id!==id)); };
-
-  const ajouterProduit = () => {
-    if(!newProd.modele.trim()) return showToast("❌ Nom obligatoire", true);
-    const prod = { ...newProd, id: Date.now(), prix: newProd.prix.filter(p=>p.s&&p.p).map(p=>({s:p.s,p:Number(String(p.p).replace(/\s/g,""))})) };
-    save([...cat, prod]);
-    setNewProd({ modele:"", description:"", photo:"", cat:"iPhones", disponible:true, prix:[{s:"128 Go",p:""}] });
-    setShowAdd(false);
-  };
-
-  const sauvegarderEdit = () => {
-    if(!editModal) return;
-    const updated = { ...editModal, prix: editModal.prix.filter(p=>p.s&&p.p).map(p=>({s:p.s,p:Number(String(p.p).replace(/\s/g,""))})) };
-    save(cat.map(p => p.id!==editModal.id ? p : updated));
-    setEditModal(null);
-  };
-
-  const handlePhoto = (e, target) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if(target === "new") setNewProd(f => ({...f, photo: ev.target.result}));
-      else setEditModal(f => ({...f, photo: ev.target.result}));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const filtres = cat
-    .filter(p => filtre==="tous" || (filtre==="dispo"&&isDispo(p)) || (filtre==="rupture"&&!isDispo(p)))
-    .filter(p => !search || p.modele.toLowerCase().includes(search.toLowerCase()));
-
-  const copierTout = () => {
-    const txt = filtres.map(p=>`📱 ${p.modele}${!isDispo(p)?" (Rupture)":""}\n${p.prix.map(px=>`  • ${px.s} → ${Number(px.p).toLocaleString("fr-FR")} FCFA`).join("\n")}`).join("\n\n");
-    navigator.clipboard.writeText("🏪 ANGY COMPANY — Liste des prix\n\n"+txt+"\n\n📞 +221 78 116 32 86\n✅ Authentiques · 🚚 Livraison Dakar");
-    showToast("✅ Liste copiée !");
-  };
-
-  const cardStyle = (p) => ({
-    background: theme.card,
-    border: `1px solid ${isDispo(p) ? theme.border : "#FF453A44"}`,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
-  });
-
-  const btnStyle = (color="#0A84FF") => ({
-    padding:"8px 14px", borderRadius:10, border:`1px solid ${color}44`,
-    background:`${color}18`, color, cursor:"pointer", fontFamily:"inherit",
-    fontSize:12, fontWeight:700
-  });
-
-  return (
-    <div style={{maxWidth:1100,margin:"0 auto",padding:"24px 16px"}}>
-
-      {/* HEADER */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginBottom:20}}>
-        <div>
-          <h2 style={{margin:0,fontSize:22,fontWeight:900,color:theme.text}}>💰 Catalogue des prix</h2>
-          <div style={{fontSize:13,color:theme.textMuted,marginTop:2}}>{cat.length} produits · {cat.filter(p=>isDispo(p)).length} disponibles</div>
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button onClick={copierTout} style={btnStyle("#30D158")}>📋 Copier WhatsApp</button>
-          <button onClick={()=>{ localStorage.setItem("cat_v","reset"); save(PRIX_DEFAUT); localStorage.setItem("cat_v",V); }} style={btnStyle("#FF9F0A")}>🔄 Réinitialiser</button>
-          <button onClick={()=>setShowAdd(s=>!s)} style={{...btnStyle("#fff"),background:"#0A84FF",color:"#fff",border:"none"}}>+ Ajouter produit</button>
-        </div>
-      </div>
-
-      {/* FORMULAIRE AJOUT */}
-      {showAdd && (
-        <div style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:20,marginBottom:20}}>
-          <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:16}}>➕ Nouveau produit</h3>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-            <div>
-              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle *</label>
-              <input style={inp} value={newProd.modele} onChange={e=>setNewProd(f=>({...f,modele:e.target.value}))} placeholder="Ex: iPhone 18"/>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Catégorie</label>
-              <select style={inp} value={newProd.cat} onChange={e=>setNewProd(f=>({...f,cat:e.target.value}))}>
-                {["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"].map(c=><option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={{gridColumn:"1/-1"}}>
-              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label>
-              <input style={inp} value={newProd.description} onChange={e=>setNewProd(f=>({...f,description:e.target.value}))} placeholder="Ex: Écran 6.1 · Puce A20 · Face ID"/>
-            </div>
-            <div style={{gridColumn:"1/-1"}}>
-              <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>📷 Photo du produit</label>
-              <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                <input type="file" accept="image/*" onChange={e=>handlePhoto(e,"new")} style={{...inp,padding:"6px"}}/>
-                {newProd.photo && <img src={newProd.photo} alt="" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:`1px solid ${theme.border}`}}/>}
-              </div>
-            </div>
-          </div>
-          <div style={{marginBottom:12}}>
-            <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:8}}>Variantes de stockage & prix (FCFA)</label>
-            {newProd.prix.map((px,i)=>(
-              <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
-                <input style={{...inp,flex:1}} value={px.s} onChange={e=>setNewProd(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,s:e.target.value}:p)}))} placeholder="Ex: 128 Go"/>
-                <input style={{...inp,flex:1}} type="number" value={px.p} onChange={e=>setNewProd(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,p:e.target.value}:p)}))} placeholder="Prix FCFA"/>
-                {newProd.prix.length>1&&<button onClick={()=>setNewProd(f=>({...f,prix:f.prix.filter((_,j)=>j!==i)}))} style={{background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:16}}>🗑</button>}
-              </div>
-            ))}
-            <button onClick={()=>setNewProd(f=>({...f,prix:[...f.prix,{s:"",p:""}]}))} style={{...btnStyle("#0A84FF"),marginTop:4}}>+ Variante</button>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={ajouterProduit} style={{...btnStyle("#fff"),background:"#0A84FF",color:"#fff",border:"none",padding:"10px 20px"}}>✅ Ajouter</button>
-            <button onClick={()=>setShowAdd(false)} style={btnStyle("#FF453A")}>Annuler</button>
-          </div>
-        </div>
-      )}
-
-      {/* RECHERCHE + FILTRES */}
-      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Rechercher un modèle..." style={{...inp,flex:1,minWidth:160}}/>
-        {[["tous","Tous"],["dispo","✅ Dispo"],["rupture","❌ Rupture"]].map(([id,l])=>(
-          <button key={id} onClick={()=>setFiltre(id)} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${filtre===id?"#0A84FF":theme.border}`,background:filtre===id?"rgba(10,132,255,0.12)":"transparent",color:filtre===id?"#0A84FF":theme.textMuted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
-            {l} ({id==="tous"?cat.length:id==="dispo"?cat.filter(p=>isDispo(p)).length:cat.filter(p=>!isDispo(p)).length})
-          </button>
-        ))}
-      </div>
-
-      {/* LISTE PRODUITS */}
-      {filtres.map(p => (
-        <div key={p.id} style={cardStyle(p)}>
-          <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
-            {/* PHOTO */}
-            <div style={{width:56,height:56,borderRadius:12,border:`1px solid ${theme.border}`,overflow:"hidden",flexShrink:0,background:theme.toggleBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>
-              {p.photo ? <img src={p.photo} alt={p.modele} style={{width:"100%",height:"100%",objectFit:"cover"}}/> : "📱"}
-            </div>
-            {/* INFOS */}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:900,fontSize:17,color:theme.text}}>{p.modele}</div>
-              {p.description&&<div style={{fontSize:12,color:theme.textMuted,marginTop:2}}>{p.description}</div>}
-              {!isDispo(p)&&<div style={{display:"inline-block",background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:99,padding:"2px 10px",fontSize:11,fontWeight:700,marginTop:4}}>✕ Rupture de stock</div>}
-            </div>
-            {/* ACTIONS */}
-            <div style={{display:"flex",gap:6,flexShrink:0}}>
-              <div title={isDispo(p)?"Disponible en stock":"Rupture de stock"} style={{background:isDispo(p)?"#30D15822":"#FF453A22",color:isDispo(p)?"#30D158":"#FF453A",border:`1px solid ${isDispo(p)?"#30D15844":"#FF453A44"}`,borderRadius:8,padding:"6px 10px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center"}}>
-                {isDispo(p)?"✅":"❌"}
-              </div>
-              <button onClick={()=>setEditModal({...p})} title="Modifier" style={{background:"#0A84FF22",color:"#0A84FF",border:"1px solid #0A84FF44",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>✏️</button>
-              <button onClick={()=>supprimerProduit(p.id)} title="Supprimer" style={{background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>🗑</button>
-            </div>
-          </div>
-          {/* PRIX */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {p.prix.map((px,i)=>(
-              <div key={i} style={{background:theme.toggleBg,border:`1px solid ${theme.border}`,borderRadius:10,padding:"8px 14px",minWidth:90,textAlign:"center"}}>
-                <div style={{fontSize:11,color:theme.textMuted,marginBottom:2}}>{px.s}</div>
-                <div style={{fontWeight:800,fontSize:15,color:"#30D158"}}>{Number(px.p).toLocaleString("fr-FR")} F</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {filtres.length===0&&<div style={{textAlign:"center",padding:40,color:theme.textMuted}}>Aucun produit trouvé</div>}
-
-      {/* MODAL EDITION */}
-      {editModal && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setEditModal(null)}}>
-          <div style={{background:theme.card,borderRadius:20,padding:24,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
-            <h3 style={{margin:"0 0 16px",color:theme.text,fontSize:18}}>✏️ Modifier {editModal.modele}</h3>
-            <div style={{display:"grid",gap:12,marginBottom:16}}>
-              <div>
-                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Nom du modèle</label>
-                <input style={inp} value={editModal.modele} onChange={e=>setEditModal(f=>({...f,modele:e.target.value}))}/>
-              </div>
-              <div>
-                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Catégorie</label>
-                <select style={inp} value={editModal.cat||"iPhones"} onChange={e=>setEditModal(f=>({...f,cat:e.target.value}))}>
-                  {["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"].map(c=><option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>Description</label>
-                <input style={inp} value={editModal.description||""} onChange={e=>setEditModal(f=>({...f,description:e.target.value}))} placeholder="Écran · Puce · Caractéristiques"/>
-              </div>
-              <div>
-                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:4}}>📷 Photo</label>
-                <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                  {editModal.photo&&<img src={editModal.photo} alt="" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:`1px solid ${theme.border}`}}/>}
-                  <input type="file" accept="image/*" onChange={e=>handlePhoto(e,"edit")} style={{...inp,padding:"6px"}}/>
-                  {editModal.photo&&<button onClick={()=>setEditModal(f=>({...f,photo:""}))} style={{...btnStyle("#FF453A"),padding:"6px 10px"}}>✕ Suppr.</button>}
-                </div>
-              </div>
-              <div>
-                <label style={{fontSize:11,color:theme.textMuted,display:"block",marginBottom:8}}>Variantes & Prix (FCFA)</label>
-                {editModal.prix.map((px,i)=>(
-                  <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
-                    <input style={{...inp,flex:1}} value={px.s} onChange={e=>setEditModal(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,s:e.target.value}:p)}))} placeholder="128 Go"/>
-                    <input style={{...inp,flex:1}} type="number" value={px.p} onChange={e=>setEditModal(f=>({...f,prix:f.prix.map((p,j)=>j===i?{...p,p:e.target.value}:p)}))} placeholder="Prix"/>
-                    {editModal.prix.length>1&&<button onClick={()=>setEditModal(f=>({...f,prix:f.prix.filter((_,j)=>j!==i)}))} style={{background:"#FF453A22",color:"#FF453A",border:"1px solid #FF453A44",borderRadius:8,padding:"8px 12px",cursor:"pointer"}}>🗑</button>}
-                  </div>
-                ))}
-                <button onClick={()=>setEditModal(f=>({...f,prix:[...f.prix,{s:"",p:""}]}))} style={{...btnStyle("#0A84FF"),marginTop:4}}>+ Variante</button>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <label style={{fontSize:13,color:theme.text,fontWeight:600}}>Disponibilité</label>
-                <span style={{fontSize:12,color:isDispo(editModal)?"#30D158":"#FF453A",fontWeight:700}}>
-                  {isDispo(editModal)?`✅ En stock (${stockQtePourModele(editModal.modele, stock)})`:"❌ Rupture (calculé depuis le Stock)"}
-                </span>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={sauvegarderEdit} style={{flex:1,padding:"12px",background:"#0A84FF",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:700}}>✅ Sauvegarder</button>
-              <button onClick={()=>setEditModal(null)} style={{padding:"12px 20px",...btnStyle("#FF453A")}}>Annuler</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 
 
@@ -1889,7 +1609,6 @@ export default function App() {
     {id:"factures",  label:"Factures",   icon:"🧾", roles:["admin","vendeur"]},
     {id:"depenses",  label:"Dépenses",   icon:"📤", roles:["admin","comptable"]},
     {id:"crm",       label:"CRM",        icon:"🎯", roles:["admin","vendeur"]},
-    {id:"catalogue", label:"Catalogue",  icon:"💰", roles:["admin","vendeur"]},
     {id:"analyse",   label:"Analyse",    icon:"📊", roles:["admin","comptable"]},
   ].filter(n=>!n.roles||n.roles.includes(user?.role));
 
@@ -1953,7 +1672,6 @@ export default function App() {
               )}
               {page==="depenses"  &&<Depenses  depenses={depenses} setDepenses={setDepenses} setStock={setStock} showToast={showToast} role={user?.role}/>}
               {page==="crm"       &&<CRM       showToast={showToast}/>}
-              {page==="catalogue" &&<Catalogue showToast={showToast} stock={stock} setStock={setStock}/>}
               {page==="analyse"   &&<Analyse   ventes={ventes} stock={stock} depenses={depenses} factures={factures}/>}
             </>
           )}
