@@ -1,14 +1,5 @@
 import { useState, useEffect, useContext, createContext, useRef } from "react";
 
-// ─── SHIM localStorage (artifacts n'autorisent pas le vrai localStorage du navigateur) ──
-const _mem = {};
-const localStorage = {
-  getItem: (k) => (k in _mem ? _mem[k] : null),
-  setItem: (k, v) => { _mem[k] = String(v); },
-  removeItem: (k) => { delete _mem[k]; },
-};
-
-
 // ─── CONFIG SUPABASE ──────────────────────────────────────────────────────────
 const SURL = "https://nfpnhyvuwpzezwbmxtgd.supabase.co";
 const SKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mcG5oeXZ1d3B6ZXp3Ym14dGdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODU5NTAsImV4cCI6MjA5NjE2MTk1MH0.u9ptkVSXwgT75m9WgRLsUnygEJGYK4ESyv6jBUeNtO4";
