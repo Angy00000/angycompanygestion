@@ -1,5 +1,14 @@
 import { useState, useEffect, useContext, createContext, useRef } from "react";
 
+// ─── SHIM localStorage (artifacts n'autorisent pas le vrai localStorage du navigateur) ──
+const _mem = {};
+const localStorage = {
+  getItem: (k) => (k in _mem ? _mem[k] : null),
+  setItem: (k, v) => { _mem[k] = String(v); },
+  removeItem: (k) => { delete _mem[k]; },
+};
+
+
 // ─── CONFIG SUPABASE ──────────────────────────────────────────────────────────
 const SURL = "https://nfpnhyvuwpzezwbmxtgd.supabase.co";
 const SKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mcG5oeXZ1d3B6ZXp3Ym14dGdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODU5NTAsImV4cCI6MjA5NjE2MTk1MH0.u9ptkVSXwgT75m9WgRLsUnygEJGYK4ESyv6jBUeNtO4";
@@ -648,6 +657,112 @@ const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAd
 };
 
 // ─── DEPENSES ─────────────────────────────────────────────────────────────────
+
+const Caisse = ({ caisse, setCaisse, ventes, depenses, showToast }) => {
+  const { theme } = useContext(ThemeCtx);
+  const [form,setForm] = useState({ type:"apport", montant:"", motif:"", date:new Date().toISOString().slice(0,10) });
+  const [loading,setLoading] = useState(false);
+  const [confirmDel,setConfirmDel] = useState(null);
+  const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
+
+  const totalVentes = ventes.reduce((s,v)=>s+Number(v.prix_vente)*Number(v.qte||1),0);
+  const totalDepenses = depenses.reduce((s,d)=>s+Number(d.montant),0);
+  const totalApports = caisse.filter(c=>c.type==="apport").reduce((s,c)=>s+Number(c.montant),0);
+  const totalRetraits = caisse.filter(c=>c.type==="retrait").reduce((s,c)=>s+Number(c.montant),0);
+  const benefice = totalVentes - totalDepenses;
+  const solde = totalVentes - totalDepenses + totalApports - totalRetraits;
+
+  const ajouter = async () => {
+    if(!form.montant) return showToast("Montant obligatoire",true);
+    setLoading(true);
+    const c = await db.add("caisse",{ type:form.type, montant:Number(form.montant), motif:form.motif||(form.type==="apport"?"Apport":"Retrait"), date:form.date });
+    if(c&&!c._error){
+      setCaisse(prev=>[c,...prev]);
+      showToast(form.type==="apport"?"✅ Apport ajouté !":"✅ Retrait ajouté !");
+      setForm({ type:form.type, montant:"", motif:"", date:new Date().toISOString().slice(0,10) });
+    } else showToast("Erreur: "+(c?._message?.substring(0,100)||"connexion"),true);
+    setLoading(false);
+  };
+  const confirmerSuppr = async () => { const r=await db.del("caisse",confirmDel); if(r&&r._error)return showToast("Erreur: "+(r._message?.substring(0,100)||""),true); setCaisse(prev=>prev.filter(c=>c.id!==confirmDel)); showToast("✅ Supprimé"); setConfirmDel(null); };
+
+  const mouvements = [
+    ...ventes.map(v=>({ id:"v"+v.id, sens:"+", label:`🛒 Vente: ${v.produit}`, montant:Number(v.prix_vente)*Number(v.qte||1), date:v.date, type:"vente" })),
+    ...depenses.map(d=>({ id:"d"+d.id, sens:"-", label:`📤 Dépense: ${d.titre}`, montant:Number(d.montant), date:d.date, type:"depense" })),
+    ...caisse.map(c=>({ id:"c"+c.id, sens:c.type==="apport"?"+":"-", label:`${c.type==="apport"?"💰 Apport":"✋ Retrait"}${c.motif?": "+c.motif:""}`, montant:Number(c.montant), date:c.date, type:c.type, rawId:c.id })),
+  ].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0,30);
+
+  return (
+    <div style={{ padding:"20px 16px", maxWidth:1100, margin:"0 auto" }}>
+      <div style={{ fontSize:22, fontWeight:800, color:theme.text, marginBottom:20 }}>💵 Ma Caisse</div>
+
+      {/* SOLDE PRINCIPAL */}
+      <div style={{ background:"linear-gradient(135deg,#0A84FF,#5E5CE6)", borderRadius:20, padding:"24px 22px", color:"#fff", marginBottom:16, position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", right:-20, top:-20, width:100, height:100, background:"rgba(255,255,255,0.08)", borderRadius:"50%" }}/>
+        <div style={{ fontSize:14, fontWeight:600, opacity:0.85, marginBottom:8 }}>💰 Ce que j'ai en caisse</div>
+        <div style={{ fontSize:32, fontWeight:900 }}>{solde.toLocaleString("fr-FR")} FCFA</div>
+        <div style={{ fontSize:12, opacity:0.75, marginTop:4 }}>Ventes + Apports − Dépenses − Retraits</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:14, marginBottom:20 }}>
+        <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:16 }}>
+          <div style={{ fontSize:12, color:theme.textMuted, marginBottom:6 }}>📈 Bénéfice net (ventes − dépenses)</div>
+          <div style={{ fontSize:20, fontWeight:800, color:benefice>=0?"#30D158":"#FF453A" }}>{benefice.toLocaleString("fr-FR")} F</div>
+        </div>
+        <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:16 }}>
+          <div style={{ fontSize:12, color:theme.textMuted, marginBottom:6 }}>💼 Apports − Retraits</div>
+          <div style={{ fontSize:20, fontWeight:800, color:theme.text }}>{(totalApports-totalRetraits).toLocaleString("fr-FR")} F</div>
+        </div>
+      </div>
+
+      {/* FORMULAIRE */}
+      <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:20, marginBottom:20 }}>
+        <div style={{ fontSize:14, fontWeight:700, color:theme.text, marginBottom:14 }}>+ Nouveau mouvement</div>
+        <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+          <button onClick={()=>setForm(f=>({...f,type:"apport"}))} style={{ flex:1, padding:"10px", borderRadius:10, border:`1px solid ${form.type==="apport"?"#30D158":theme.border}`, background:form.type==="apport"?"rgba(48,209,88,0.12)":"transparent", color:form.type==="apport"?"#30D158":theme.textMuted, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>💰 Apport (j'ajoute)</button>
+          <button onClick={()=>setForm(f=>({...f,type:"retrait"}))} style={{ flex:1, padding:"10px", borderRadius:10, border:`1px solid ${form.type==="retrait"?"#FF453A":theme.border}`, background:form.type==="retrait"?"rgba(255,69,58,0.12)":"transparent", color:form.type==="retrait"?"#FF453A":theme.textMuted, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>✋ Retrait (je sors)</button>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr 1fr auto", gap:10, alignItems:"end" }}>
+          <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Montant *</label><input type="number" style={inp} value={form.montant} onChange={e=>setForm(f=>({...f,montant:e.target.value}))}/></div>
+          <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Motif</label><input style={inp} value={form.motif} onChange={e=>setForm(f=>({...f,motif:e.target.value}))} placeholder={form.type==="apport"?"Ex: Capital initial":"Ex: Dépense perso"}/></div>
+          <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
+          <button onClick={ajouter} disabled={loading} style={{ padding:"10px 18px", borderRadius:10, background:form.type==="apport"?"#30D158":"#FF453A", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>{loading?"⏳":"✅"}</button>
+        </div>
+      </div>
+
+      {/* HISTORIQUE */}
+      <div style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:16, padding:20 }}>
+        <div style={{ fontSize:14, fontWeight:700, color:theme.text, marginBottom:14 }}>📜 Mouvements récents</div>
+        {mouvements.length===0?(
+          <div style={{ textAlign:"center", color:theme.textMuted, padding:20, fontSize:13 }}>Aucun mouvement pour l'instant</div>
+        ):mouvements.map((m,i)=>(
+          <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderBottom:i<mouvements.length-1?`1px solid ${theme.border}`:"none" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{m.label}</div>
+              <div style={{ fontSize:11, color:theme.textMuted }}>{m.date}</div>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:m.sens==="+"?"#30D158":"#FF453A" }}>{m.sens}{Number(m.montant).toLocaleString("fr-FR")} F</div>
+              {m.rawId&&<button onClick={()=>setConfirmDel(m.rawId)} title="Supprimer" style={{ background:"#FF453A22", color:"#FF453A", border:"1px solid #FF453A44", borderRadius:8, padding:"4px 8px", cursor:"pointer", fontSize:12 }}>🗑</button>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {confirmDel&&(
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}>
+          <div style={{ background:theme.card, borderRadius:16, padding:24, maxWidth:340, width:"100%" }}>
+            <div style={{ fontSize:16, fontWeight:800, color:theme.text, marginBottom:8 }}>Supprimer ce mouvement ?</div>
+            <div style={{ fontSize:13, color:theme.textMuted, marginBottom:20 }}>Cette action est irréversible.</div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={confirmerSuppr} style={{ flex:1, padding:"12px", borderRadius:12, background:"#FF453A", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>Supprimer</button>
+              <button onClick={()=>setConfirmDel(null)} style={{ flex:1, padding:"12px", borderRadius:12, background:theme.toggleBg, color:theme.text, border:`1px solid ${theme.border}`, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
   const { theme } = useContext(ThemeCtx);
@@ -1542,6 +1657,7 @@ export default function App() {
   const [ventes,setVentes] = useState([]);
   const [factures,setFactures] = useState([]);
   const [depenses,setDepenses] = useState([]);
+  const [caisse,setCaisse] = useState([]);
   const [loading,setLoading] = useState(true);
   const [toast,setToast] = useState(null);
   const [ventePrefill,setVentePrefill] = useState(null);
@@ -1565,8 +1681,8 @@ export default function App() {
         const ok = await syncQueue();
         if(ok){
           // Refresh data after sync
-          const [s,v,f,d] = await Promise.all([db.get("stock"),db.get("ventes"),db.get("factures"),db.get("depenses")]);
-          setStock(s); setVentes(v); setFactures(f); setDepenses(d);
+          const [s,v,f,d,c] = await Promise.all([db.get("stock"),db.get("ventes"),db.get("factures"),db.get("depenses"),db.get("caisse")]);
+          setStock(s); setVentes(v); setFactures(f); setDepenses(d); setCaisse(c);
           setPendingSync(0);
           showToast("✅ Synchronisation réussie !");
         }
@@ -1586,8 +1702,8 @@ export default function App() {
   useEffect(()=>{
     if(!user) return;
     setLoading(true);
-    Promise.all([db.get("stock"),db.get("ventes"),db.get("factures"),db.get("depenses")])
-      .then(([s,v,f,d])=>{ setStock(s); setVentes(v); setFactures(f); setDepenses(d); })
+    Promise.all([db.get("stock"),db.get("ventes"),db.get("factures"),db.get("depenses"),db.get("caisse")])
+      .then(([s,v,f,d,c])=>{ setStock(s); setVentes(v); setFactures(f); setDepenses(d); setCaisse(c); })
       .catch(()=>{}).finally(()=>setLoading(false));
   },[user]);
 
@@ -1599,6 +1715,7 @@ export default function App() {
     {id:"ventes",    label:"Ventes",     icon:"🛒", roles:["admin","vendeur"]},
     {id:"factures",  label:"Factures",   icon:"🧾", roles:["admin","vendeur"]},
     {id:"depenses",  label:"Dépenses",   icon:"📤", roles:["admin","comptable"]},
+    {id:"caisse",    label:"Ma Caisse",  icon:"💵", roles:["admin","comptable"]},
     {id:"crm",       label:"CRM",        icon:"🎯", roles:["admin","vendeur"]},
     {id:"analyse",   label:"Analyse",    icon:"📊", roles:["admin","comptable"]},
   ].filter(n=>!n.roles||n.roles.includes(user?.role));
@@ -1662,6 +1779,7 @@ export default function App() {
                 </div>
               )}
               {page==="depenses"  &&<Depenses  depenses={depenses} setDepenses={setDepenses} setStock={setStock} showToast={showToast} role={user?.role}/>}
+              {page==="caisse"    &&<Caisse    caisse={caisse} setCaisse={setCaisse} ventes={ventes} depenses={depenses} showToast={showToast}/>}
               {page==="crm"       &&<CRM       showToast={showToast}/>}
               {page==="analyse"   &&<Analyse   ventes={ventes} stock={stock} depenses={depenses} factures={factures}/>}
             </>
