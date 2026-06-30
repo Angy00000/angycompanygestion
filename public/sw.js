@@ -1,4 +1,4 @@
-const CACHE_NAME = 'angy-cache-v2';
+const CACHE_NAME = 'angy-cache-v3';
 
 // Install: cache everything
 self.addEventListener('install', e => {
@@ -23,21 +23,18 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Tout le reste: cache first, puis réseau
+  // Tout le reste: réseau d'abord (toujours la dernière version), cache seulement si hors-ligne
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => {
-        // Offline fallback pour navigation
-        if (e.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
+    fetch(e.request).then(res => {
+      if (res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => {
+      return caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        if (e.request.mode === 'navigate') return caches.match('/index.html');
       });
     })
   );
