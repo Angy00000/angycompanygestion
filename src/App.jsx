@@ -180,7 +180,7 @@ const Login = ({ onLogin }) => {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
 
-const CATS_DEFAUT = ["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Autre"];
+const CATS_DEFAUT = ["iPhones","Samsung","Tablettes","Accessoires","Ordinateurs","Occasion","Autre"];
 
 
 const Dashboard = ({ stock, ventes, factures, depenses }) => {
@@ -544,14 +544,16 @@ const Stock = ({ stock: stockRaw, setStock, showToast, role }) => {
 
 const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAdded }) => {
   const { theme } = useContext(ThemeCtx);
-  const [form,setForm] = useState({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
+  const [form,setForm] = useState({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"", troc:false, troc_desc:"", troc_valeur:"" });
   const [loading,setLoading] = useState(false);
   const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
   const total = ventes.reduce((s,v)=>s+Number(v.prix_vente)*Number(v.qte||1),0);
+  const montantEncaisse = Number(form.prix_vente||0) - (form.troc?Number(form.troc_valeur||0):0);
   const ajouter = async () => {
     if(!form.produit||!form.prix_vente) return showToast("Produit et prix obligatoires",true);
+    if(form.troc && (!form.troc_desc||!form.troc_valeur)) return showToast("Description et valeur de reprise obligatoires",true);
     setLoading(true);
-    const data = { produit:form.produit, cat:form.cat, qte:Number(form.qte)||1, prix_vente:Number(form.prix_vente), date:form.date, client:form.client||"—" };
+    const data = { produit:form.produit, cat:form.cat, qte:Number(form.qte)||1, prix_vente:Number(form.prix_vente), date:form.date, client:form.client||"—", troc:!!form.troc, troc_desc:form.troc?form.troc_desc:null, troc_valeur:form.troc?Number(form.troc_valeur):null };
     const v = await db.add("ventes",data);
     if(v&&!v._error){
       setVentes(prev=>[v,...prev]);
@@ -564,8 +566,14 @@ const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAd
         const rPatch=await db.patch("stock", stockItem.id, {qte: newQte});
         if(!(rPatch&&rPatch._error)&&setStock) setStock(prev=>prev.map(s=>s.id===stockItem.id?{...s,qte:newQte}:s));
       }
-      showToast("✅ Vente enregistrée !");
-      setForm({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"" });
+      // Si troc : ajouter le téléphone repris au stock "Occasion"
+      if(form.troc && form.troc_desc){
+        const occData = { nom:form.troc_desc, cat:"Occasion", qte:1, prix_achat:Number(form.troc_valeur)||0, prix_vente:0, seuil:1 };
+        const occ = await db.add("stock",occData);
+        if(occ&&!occ._error&&setStock) setStock(prev=>[occ,...prev]);
+      }
+      showToast(form.troc?"✅ Vente avec reprise enregistrée !":"✅ Vente enregistrée !");
+      setForm({ produit:"", cat:"", qte:"1", prix_vente:"", date:new Date().toISOString().slice(0,10), client:"", troc:false, troc_desc:"", troc_valeur:"" });
       if(onVenteAdded) onVenteAdded(v);
     }
     else showToast("Erreur: "+(v?._message?.substring(0,100)||"connexion"),true);
@@ -612,13 +620,30 @@ const Ventes = ({ ventes, setVentes, stock, setStock, showToast, role, onVenteAd
             <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Client</label><input style={inp} value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} placeholder="Optionnel"/></div>
             <button onClick={ajouter} disabled={loading} style={{ padding:"10px 18px", borderRadius:10, background:"#30D158", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>{loading?"⏳":"✅"}</button>
           </div>
+          <div style={{ marginTop:14 }}>
+            <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:theme.text, cursor:"pointer", fontWeight:600 }}>
+              <input type="checkbox" checked={form.troc} onChange={e=>setForm(f=>({...f,troc:e.target.checked}))} style={{ width:16, height:16 }}/>
+              🔄 Avec reprise (troc)
+            </label>
+            {form.troc&&(
+              <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10, marginTop:10 }}>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Téléphone repris (modèle, état, couleur) *</label><input style={inp} value={form.troc_desc} onChange={e=>setForm(f=>({...f,troc_desc:e.target.value}))} placeholder="Ex: iPhone 11 noir, bon état"/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Valeur de reprise *</label><input type="number" style={inp} value={form.troc_valeur} onChange={e=>setForm(f=>({...f,troc_valeur:e.target.value}))}/></div>
+              </div>
+            )}
+            {form.troc&&form.prix_vente&&(
+              <div style={{ marginTop:10, fontSize:13, color:theme.textMuted }}>
+                Montant encaissé (client paie) : <span style={{ fontWeight:800, color:"#30D158" }}>{montantEncaisse.toLocaleString("fr-FR")} F</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
       <div style={{ display:"grid", gap:8 }}>
         {ventes.length===0&&<div style={{ textAlign:"center", padding:"3rem", color:theme.textMuted }}>Aucune vente</div>}
         {ventes.map(v=>(
           <div key={v.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-            <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{v.produit}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{v.date} · Qté: {v.qte||1} · {v.client||"—"}</div></div>
+            <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text, display:"flex", alignItems:"center", gap:6 }}>{v.produit}{v.troc&&<span style={{ fontSize:11, fontWeight:700, color:"#0A84FF", background:"rgba(10,132,255,0.1)", border:"1px solid rgba(10,132,255,0.3)", borderRadius:6, padding:"2px 7px" }}>🔄 Troc</span>}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{v.date} · Qté: {v.qte||1} · {v.client||"—"}{v.troc&&v.troc_desc?` · Repris: ${v.troc_desc} (${Number(v.troc_valeur).toLocaleString("fr-FR")} F)`:""}</div></div>
             <div style={{ fontWeight:800, fontSize:16, color:"#30D158" }}>{(Number(v.prix_vente)*Number(v.qte||1)).toLocaleString("fr-FR")} F</div>
             {role==="admin"&&<><button onClick={()=>setEditModal({...v})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(v.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button></>}
           </div>
