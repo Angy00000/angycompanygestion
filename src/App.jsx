@@ -900,29 +900,39 @@ const Depenses = ({ depenses, setDepenses, setStock, showToast, role }) => {
 
 // ─── FACTURES ─────────────────────────────────────────────────────────────────
 
-const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill, setVentePrefill }) => {
+const Factures = ({ factures, setFactures, stock, setStock, showToast, role, ventePrefill, setVentePrefill }) => {
   const { theme } = useContext(ThemeCtx);
-  const [form,setForm] = useState({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"" });
+  const [form,setForm] = useState({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"", troc:false, troc_desc:"", troc_valeur:"" });
   const [loading,setLoading] = useState(false);
   const [showDetails,setShowDetails] = useState({});
 
   // Pré-remplir depuis une vente
   useEffect(()=>{
     if(ventePrefill){
-      setForm(f=>({...f, client:ventePrefill.client||"", lignes:[{produit:ventePrefill.produit||"",qte:ventePrefill.qte||1,prix:String(ventePrefill.prix_vente||""),imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:ventePrefill.date||f.date }));
+      setForm(f=>({...f, client:ventePrefill.client||"", lignes:[{produit:ventePrefill.produit||"",qte:ventePrefill.qte||1,prix:String(ventePrefill.prix_vente||""),imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:ventePrefill.date||f.date, troc:!!ventePrefill.troc, troc_desc:ventePrefill.troc_desc||"", troc_valeur:ventePrefill.troc_valeur?String(ventePrefill.troc_valeur):"" }));
       setVentePrefill(null);
     }
   },[ventePrefill]);
 
   const inp = { boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:`1px solid ${theme.border}`, background:theme.input, color:theme.text, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
   const total = form.lignes.reduce((s,l)=>s+Number(l.prix||0)*Number(l.qte||1),0);
+  const totalNet = total - (form.troc?Number(form.troc_valeur||0):0);
 
   const ajouter = async () => {
     if(!form.client) return showToast("Nom client obligatoire",true);
+    if(form.troc && (!form.troc_desc||!form.troc_valeur)) return showToast("Description et valeur de reprise obligatoires",true);
     setLoading(true);
     const num = "FAC-"+Date.now().toString().slice(-6);
-    const f = await db.add("factures",{ numero:num, client:form.client, telephone:form.telephone, date:form.date, lignes:JSON.stringify(form.lignes), total, paiement:form.paiement, note:form.note });
-    if(f&&!f._error){ setFactures(prev=>[f,...prev]); showToast("✅ Facture créée !"); setForm({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"" }); }
+    const f = await db.add("factures",{ numero:num, client:form.client, telephone:form.telephone, date:form.date, lignes:JSON.stringify(form.lignes), total:totalNet, paiement:form.paiement, note:form.note, troc:!!form.troc, troc_desc:form.troc?form.troc_desc:null, troc_valeur:form.troc?Number(form.troc_valeur):null });
+    if(f&&!f._error){
+      setFactures(prev=>[f,...prev]);
+      if(form.troc && form.troc_desc && setStock){
+        const occ = await db.add("stock",{ nom:form.troc_desc, cat:"Occasion", qte:1, prix_achat:Number(form.troc_valeur)||0, prix_vente:0, seuil:1 });
+        if(occ&&!occ._error) setStock(prev=>[occ,...prev]);
+      }
+      showToast("✅ Facture créée !");
+      setForm({ client:"", telephone:"", lignes:[{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}], date:new Date().toISOString().slice(0,10), paiement:"Espèces", note:"", troc:false, troc_desc:"", troc_valeur:"" });
+    }
     else showToast("Erreur: "+(f?._message?.substring(0,100)||"connexion"),true);
     setLoading(false);
   };
@@ -977,6 +987,9 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
           <td><strong>${(Number(l.prix)*Number(l.qte)).toLocaleString("fr-FR")} F</strong></td>
         </tr>`).join("")}
       </table>
+      ${f.troc?`<div style="display:flex;justify-content:space-between;font-size:13px;color:#666;margin-top:10px;padding-top:10px;border-top:1px dashed #ccc">
+        <span>🔄 Reprise : ${f.troc_desc||""}</span><span>− ${Number(f.troc_valeur).toLocaleString("fr-FR")} F</span>
+      </div>`:""}
       <div class="total">Total : ${Number(f.total).toLocaleString("fr-FR")} FCFA</div>
       ${f.note?`<p style="margin-top:16px;font-size:13px;color:#666"><b>Note :</b> ${f.note}</p>`:""}
       <div class="footer">Merci pour votre confiance — ANGY COMPANY · Dakar, Sénégal<br/>Ce document tient lieu de facture</div>
@@ -1030,10 +1043,24 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
             </div>
           ))}
 
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:theme.text, cursor:"pointer", fontWeight:600 }}>
+              <input type="checkbox" checked={form.troc} onChange={e=>setForm(f=>({...f,troc:e.target.checked}))} style={{ width:16, height:16 }}/>
+              🔄 Avec reprise (troc)
+            </label>
+            {form.troc&&(
+              <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10, marginTop:10 }}>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Téléphone repris (modèle, état, couleur) *</label><input style={inp} value={form.troc_desc} onChange={e=>setForm(f=>({...f,troc_desc:e.target.value}))} placeholder="Ex: iPhone 11 noir, bon état"/></div>
+                <div><label style={{ fontSize:11, color:theme.textMuted, display:"block", marginBottom:4 }}>Valeur de reprise *</label><input type="number" style={inp} value={form.troc_valeur} onChange={e=>setForm(f=>({...f,troc_valeur:e.target.value}))}/></div>
+              </div>
+            )}
+          </div>
+
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:4 }}>
             <button onClick={()=>setForm(f=>({...f,lignes:[...f.lignes,{produit:"",qte:1,prix:"",imei:"",couleur:"",stockage:"",etat:"Neuf"}]}))} style={{ padding:"8px 16px", borderRadius:9, background:"rgba(10,132,255,0.1)", color:"#0A84FF", border:"1px solid rgba(10,132,255,0.3)", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600 }}>+ Ajouter une ligne</button>
             <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-              <span style={{ fontWeight:700, color:theme.text, fontSize:15 }}>Total : {total.toLocaleString("fr-FR")} FCFA</span>
+              {form.troc&&form.troc_valeur?<span style={{ fontSize:13, color:theme.textMuted }}>Sous-total {total.toLocaleString("fr-FR")} F − reprise {Number(form.troc_valeur).toLocaleString("fr-FR")} F =</span>:null}
+              <span style={{ fontWeight:700, color:theme.text, fontSize:15 }}>Total : {totalNet.toLocaleString("fr-FR")} FCFA</span>
               <button onClick={ajouter} disabled={loading} style={{ padding:"10px 20px", borderRadius:10, background:"#0A84FF", color:"#fff", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"inherit", fontSize:14 }}>{loading?"⏳":"✅ Créer la facture"}</button>
             </div>
           </div>
@@ -1049,7 +1076,7 @@ const Factures = ({ factures, setFactures, stock, showToast, role, ventePrefill,
         {factures.length===0&&<div style={{ textAlign:"center", padding:"3rem", color:theme.textMuted }}>Aucune facture</div>}
         {factures.map(f=>(
           <div key={f.id} style={{ background:theme.card, border:`1px solid ${theme.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-            <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text }}>{f.numero} — {f.client}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{f.date} · {f.paiement}</div></div>
+            <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:theme.text, display:"flex", alignItems:"center", gap:6 }}>{f.numero} — {f.client}{f.troc&&<span style={{ fontSize:11, fontWeight:700, color:"#0A84FF", background:"rgba(10,132,255,0.1)", border:"1px solid rgba(10,132,255,0.3)", borderRadius:6, padding:"2px 7px" }}>🔄 Troc</span>}</div><div style={{ fontSize:12, color:theme.textMuted, marginTop:3 }}>{f.date} · {f.paiement}</div></div>
             <div style={{ fontWeight:800, fontSize:16, color:"#0A84FF" }}>{Number(f.total).toLocaleString("fr-FR")} F</div>
             <button onClick={()=>imprimer(f)} style={{ background:"rgba(10,132,255,0.1)", border:"1px solid rgba(10,132,255,0.3)", color:"#0A84FF", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🖨 Imprimer</button>
             {role==="admin"&&<><button onClick={()=>setEditModal({...f})} style={{background:"rgba(10,132,255,0.1)",color:"#0A84FF",border:"1px solid rgba(10,132,255,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>supprimer(f.id)} style={{ background:"rgba(255,69,58,0.1)", border:"1px solid rgba(255,69,58,0.3)", color:"#FF453A", padding:"7px 12px", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:12, fontWeight:600 }}>🗑</button></>}
@@ -1779,7 +1806,7 @@ export default function App() {
               {page==="dashboard" &&<Dashboard stock={stock} ventes={ventes} factures={factures} depenses={depenses}/>}
               {page==="stock"     &&<Stock     stock={stock} setStock={setStock} showToast={showToast} role={user?.role}/>}
               {page==="ventes"    &&<Ventes    ventes={ventes} setVentes={setVentes} stock={stock} setStock={setStock} showToast={showToast} role={user?.role} onVenteAdded={(v)=>{setVentePrefill(v);setShowFacturePopup(true);}}/>}
-              {page==="factures"  &&<Factures  factures={factures} setFactures={setFactures} stock={stock} showToast={showToast} role={user?.role} ventePrefill={ventePrefill} setVentePrefill={setVentePrefill}/>}
+              {page==="factures"  &&<Factures  factures={factures} setFactures={setFactures} stock={stock} setStock={setStock} showToast={showToast} role={user?.role} ventePrefill={ventePrefill} setVentePrefill={setVentePrefill}/>}
               {/* POPUP CRÉER FACTURE */}
               {showFacturePopup&&(
                 <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:2000 }}>
